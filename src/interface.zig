@@ -38,8 +38,10 @@ pub const Interface = struct {
     }
 
     pub fn addPeer(self: *Interface, peer_interface: *Interface) !void {
-        var peer = try self.peers.addOne();
-        peer.* = Peer.init(self.peers.allocator, peer_interface);
+        var my_peer = try self.peers.addOne();
+        my_peer.* = Peer.init(self.peers.allocator, peer_interface);
+        var their_peer = try peer_interface.peers.addOne();
+        their_peer.* = Peer.init(peer_interface.peers.allocator, self);
     }
 
     pub fn toOpenBSD(self: *Interface, writer: anytype) !void {
@@ -55,7 +57,7 @@ pub const Interface = struct {
         for (self.peers.items) |peer| {
             const peer_if: *Interface = peer.interface;
             try writer.print("wgpeer {s} ", .{ peer_if.keypair.publicBase64() });
-            try writer.print("wgaip {s}/32 ", .{ peer_if.address });
+            try writer.print("wgaip {s} ", .{ peer_if.address });
             for (peer.allowed_ips.items) |allowed_ip| {
                 try writer.print("wgaip {s} ", .{ allowed_ip });
             }
@@ -120,4 +122,6 @@ test "e" {
     try if1.addPeer(&if3);
     std.debug.print("\n", .{});
     try if1.toOpenBSD(std.io.getStdErr().writer());
+    try if2.toOpenBSD(std.io.getStdErr().writer());
+    try if3.toOpenBSD(std.io.getStdErr().writer());
 }
