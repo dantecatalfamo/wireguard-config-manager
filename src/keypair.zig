@@ -23,7 +23,8 @@ pub const KeyPair = struct {
 };
 
 pub fn generateKeyPair() !KeyPair {
-    const privkey = std.crypto.ecc.Curve25519.scalar.random();
+    var privkey = std.crypto.ecc.Curve25519.scalar.random();
+    std.crypto.ecc.Curve25519.scalar.clamp(&privkey);
     const pubkey = blk: {
         const curve = try std.crypto.ecc.Curve25519.basePoint.clampedMul(privkey);
         break :blk curve.toBytes();
