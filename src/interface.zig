@@ -19,6 +19,7 @@ pub const Interface = struct {
     preshared_key: ?[32]u8 = null,
 
     pub fn init(allocator: mem.Allocator, name: []const u8, privkey: [32]u8, address: []const u8, prefix: u6) !Interface {
+        // TODO multiple IPs, other interface parameter options
         return Interface{
             .keypair = try kp.fromPrivateKey(privkey),
             .name = try allocator.dupe(u8, name),
@@ -150,11 +151,14 @@ pub const AllowedIP = struct {
 };
 
 test "e" {
+    const stderr = std.io.getStdErr().writer();
     const k = try kp.generateKeyPair();
     const k2 = try kp.generateKeyPair();
     const k3 = try kp.generateKeyPair();
 
     var if1 = try Interface.init(testing.allocator, "captain", k.private, "192.168.69.1", 24);
+    if1.port = 1234;
+    if1.hostname = "example.com";
     defer if1.deinit();
     var if2 = try Interface.init(testing.allocator, "lappy", k2.private, "192.168.69.2", 24);
     defer if2.deinit();
@@ -163,13 +167,14 @@ test "e" {
 
     try if1.addPeer(&if2);
     try if1.addPeer(&if3);
+
     std.debug.print("\n", .{});
-    try if1.toOpenBSD(std.io.getStdErr().writer());
-    try if1.toConf(std.io.getStdErr().writer());
+    try if1.toOpenBSD(stderr);
+    try if1.toConf(stderr);
 
-    try if2.toOpenBSD(std.io.getStdErr().writer());
-    try if2.toConf(std.io.getStdErr().writer());
+    try if2.toOpenBSD(stderr);
+    try if2.toConf(stderr);
 
-    try if3.toOpenBSD(std.io.getStdErr().writer());
-    try if3.toConf(std.io.getStdErr().writer());
+    try if3.toOpenBSD(stderr);
+    try if3.toConf(stderr);
 }
