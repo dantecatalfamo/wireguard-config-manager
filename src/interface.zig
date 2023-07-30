@@ -38,10 +38,14 @@ pub const Interface = struct {
     }
 
     pub fn addPeer(self: *Interface, peer_interface: *Interface) !void {
+        // TODO Add peers as routers (allow entire subnet)
         var my_peer = try self.peers.addOne();
         my_peer.* = Peer.init(self.peers.allocator, peer_interface);
+        try my_peer.addAllowedIPs(peer_interface.address, 32 );
+
         var their_peer = try peer_interface.peers.addOne();
         their_peer.* = Peer.init(peer_interface.peers.allocator, self);
+        try their_peer.addAllowedIPs(self.address, 32);
     }
 
     pub fn toOpenBSD(self: *Interface, writer: anytype) !void {
@@ -57,9 +61,8 @@ pub const Interface = struct {
         for (self.peers.items) |peer| {
             const peer_if: *Interface = peer.interface;
             try writer.print("wgpeer {s} ", .{ peer_if.keypair.publicBase64() });
-            try writer.print("wgaip {s} ", .{ peer_if.address });
             for (peer.allowed_ips.items) |allowed_ip| {
-                try writer.print("wgaip {s} ", .{ allowed_ip });
+                try writer.print("wgaip {s}/{d} ", .{ allowed_ip.address, allowed_ip.prefix });
             }
             if (peer_if.preshared_key) |wgpsk| {
                 var buffer: [44]u8 = undefined;
@@ -74,6 +77,40 @@ pub const Interface = struct {
             try writer.print("# {s}\n", .{ peer_if.name });
         }
         try writer.print("up\n", .{});
+    }
+
+    pub fn toConf(self: *Interface, writer: anytype) !void {
+        try writer.print("[Interface]\n", .{});
+        try writer.print("Address = {s}/{d}\n", .{ self.address, self.prefix });
+        try writer.print("PrivateKey = {s}\n", .{ self.keypair.privateBase64() });
+        if (self.port) |port| {
+            try writer.print("ListenPort = {d}\n", .{ port });
+        }
+        for (self.peers.items) |peer| {
+            try writer.print("\n[Peer]\n", .{});
+            try writer.print("PublicKey = {s}\n", .{ peer.interface.keypair.publicBase64() });
+            if (peer.interface.preshared_key) |psk| {
+                var buffer: [44]u8 = undefined;
+                try writer.print("PresharedKey = {s}\n", .{ std.base64.standard.Encoder.encode(&buffer, &psk) });
+            }
+            if (peer.allowed_ips.items.len != 0) {
+                try writer.print("AllowedIPs = ", .{});
+                for (peer.allowed_ips.items, 0..) |allowed_ip, idx| {
+                    try writer.print("{s}/{d}", .{ allowed_ip.address, allowed_ip.prefix });
+                    if (idx != peer.allowed_ips.items.len - 1) {
+                        try writer.print(", ", .{});
+                    }
+                }
+                try writer.print("\n", .{});
+            }
+            if (peer.interface.hostname) |host| {
+                try writer.print("Endpoint = {s}", .{ host });
+                if (peer.interface.port) |port| {
+                    try writer.print(":{d}", .{ port });
+                }
+                try writer.print("\n", .{});
+            }
+        }
     }
 };
 
@@ -90,38 +127,49 @@ pub const Peer = struct {
         };
     }
 
-    pub fn addAllowedIPs(self: *Peer, range: []const u8) !void {
-        try self.allowed_ips.append(self.allowed_ips.allocator.dupe(u8, range));
+    pub fn addAllowedIPs(self: *Peer, address: []const u8, prefix: u6) !void {
+        try self.allowed_ips.append(.{
+            .address = try self.allowed_ips.allocator.dupe(u8, address),
+            .prefix = prefix,
+        });
     }
 
     pub fn deinit(self: Peer) void {
         for (self.allowed_ips.items) |item| {
-            self.allowed_ips.allocator.free(item);
+            self.allowed_ips.allocator.free(item.address);
         }
         self.allowed_ips.deinit();
     }
 };
 
-/// List of strings in the format of "allowed_ip/prefix"
 pub const AllowedIPList = std.ArrayList(AllowedIP);
 
-/// String in the format of "allowed_ip/prefix"
-pub const AllowedIP = []const u8;
+pub const AllowedIP = struct {
+    address: []const u8,
+    prefix: u6,
+};
 
 test "e" {
     const k = try kp.generateKeyPair();
     const k2 = try kp.generateKeyPair();
+    const k3 = try kp.generateKeyPair();
+
     var if1 = try Interface.init(testing.allocator, "captain", k.private, "192.168.69.1", 24);
     defer if1.deinit();
     var if2 = try Interface.init(testing.allocator, "lappy", k2.private, "192.168.69.2", 24);
     defer if2.deinit();
-    var if3 = try Interface.init(testing.allocator, "phone", k2.private, "192.168.69.3", 24);
+    var if3 = try Interface.init(testing.allocator, "phone", k3.private, "192.168.69.3", 24);
     defer if3.deinit();
 
     try if1.addPeer(&if2);
     try if1.addPeer(&if3);
     std.debug.print("\n", .{});
     try if1.toOpenBSD(std.io.getStdErr().writer());
+    try if1.toConf(std.io.getStdErr().writer());
+
     try if2.toOpenBSD(std.io.getStdErr().writer());
+    try if2.toConf(std.io.getStdErr().writer());
+
     try if3.toOpenBSD(std.io.getStdErr().writer());
+    try if3.toConf(std.io.getStdErr().writer());
 }
