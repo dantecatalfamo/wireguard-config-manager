@@ -23,23 +23,15 @@ pub const KeyPair = struct {
 };
 
 pub fn generateKeyPair() !KeyPair {
-    var privkey = std.crypto.ecc.Curve25519.scalar.random();
-    std.crypto.ecc.Curve25519.scalar.clamp(&privkey);
-    const pubkey = blk: {
-        const curve = try std.crypto.ecc.Curve25519.basePoint.clampedMul(privkey);
-        break :blk curve.toBytes();
-    };
+    const keypair = try std.crypto.dh.X25519.KeyPair.create(null);
     return KeyPair{
-        .public = pubkey,
-        .private = privkey,
+        .public = keypair.public_key,
+        .private = keypair.secret_key,
     };
 }
 
 pub fn fromPrivateKey(privkey: [32]u8) !KeyPair {
-    const pubkey = blk: {
-        const curve = try std.crypto.ecc.Curve25519.basePoint.clampedMul(privkey);
-        break :blk curve.toBytes();
-    };
+    const pubkey = try std.crypto.dh.X25519.recoverPublicKey(privkey);
     return KeyPair{
         .public = pubkey,
         .private = privkey,
