@@ -102,6 +102,7 @@ pub const Interface = struct {
         }
         for (self.peers.items) |peer| {
             try writer.print("\n[Peer]\n", .{});
+            try writer.print("# {s}\n", .{ peer.interface.name });
             try writer.print("PublicKey = {s}\n", .{ peer.interface.keypair.publicBase64() });
             if (peer.interface.preshared_key) |psk| {
                 var buffer: [44]u8 = undefined;
