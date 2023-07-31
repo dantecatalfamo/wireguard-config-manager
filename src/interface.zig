@@ -39,13 +39,22 @@ pub const Interface = struct {
     }
 
     pub fn addPeer(self: *Interface, peer_interface: *Interface) !void {
-        // TODO Add peers as routers (allow entire subnet)
         var my_peer = try self.peers.addOne();
         my_peer.* = Peer.init(self.peers.allocator, peer_interface);
-        try my_peer.addAllowedIPs(peer_interface.address, 32 );
+        try my_peer.addAllowedIPs(peer_interface.address, 32);
 
         var their_peer = try peer_interface.peers.addOne();
         their_peer.* = Peer.init(peer_interface.peers.allocator, self);
+        try their_peer.addAllowedIPs(self.address, 32);
+    }
+
+    pub fn addRouter(self: *Interface, router_interface: *Interface) !void {
+        var my_peer = try self.peers.addOne();
+        my_peer.* = Peer.init(self.peers.allocator, router_interface);
+        try my_peer.addAllowedIPs(router_interface.address, router_interface.prefix);
+
+        var their_peer = try router_interface.peers.addOne();
+        their_peer.* = Peer.init(router_interface.peers.allocator, self);
         try their_peer.addAllowedIPs(self.address, 32);
     }
 
@@ -165,16 +174,18 @@ test "e" {
     var if3 = try Interface.init(testing.allocator, "phone", k3.private, "192.168.69.3", 24);
     defer if3.deinit();
 
-    try if1.addPeer(&if2);
-    try if1.addPeer(&if3);
+    try if2.addRouter(&if1);
+    try if3.addRouter(&if1);
 
-    std.debug.print("\n", .{});
+    std.debug.print("\n############\n\n", .{});
     try if1.toOpenBSD(stderr);
     try if1.toConf(stderr);
 
+    std.debug.print("\n############\n\n", .{});
     try if2.toOpenBSD(stderr);
     try if2.toConf(stderr);
 
+    std.debug.print("\n############\n\n", .{});
     try if3.toOpenBSD(stderr);
     try if3.toConf(stderr);
 }
