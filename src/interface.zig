@@ -58,6 +58,10 @@ pub const Interface = struct {
         try their_peer.addAllowedIPs(self.address, 32);
     }
 
+    pub fn addRoutee(self: *Interface, routee_interface: *Interface) !void {
+        try routee_interface.addRouter(self);
+    }
+
     pub fn toOpenBSD(self: *Interface, writer: anytype) !void {
         if (mem.indexOf(u8, self.address, ":")) |_| {
             try writer.print("inet6 {s}/{d}\n", .{ self.address, self.prefix });
