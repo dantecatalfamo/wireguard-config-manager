@@ -6,20 +6,29 @@ const os = std.os;
 const testing = std.testing;
 
 const keypair = @import("keypair.zig");
+const config = @import("config.zig");
 
 pub fn main() !void {
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
-
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
-
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
-
-    try bw.flush(); // don't forget to flush!
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var allocator = gpa.allocator();
+    const stdin = std.io.getStdIn().reader();
+    const stdout = std.io.getStdOut().writer();
+    var env = try config.defaultEnvironment(allocator);
+    defer env.deinit();
+    while (true) {
+        try stdout.print("> ", .{});
+        const input = stdin.readUntilDelimiterAlloc(allocator, '\n', 4096) catch |err| {
+            if (err == error.EndOfStream) {
+                return;
+            }
+            return err;
+        };
+        defer allocator.free(input);
+        var tokens = config.tokenIter(allocator, input);
+        const result = try config.eval(&env, &tokens);
+        try stdout.print("=> ", .{});
+        result.debug();
+    }
 }
 
 test "simple test" {
