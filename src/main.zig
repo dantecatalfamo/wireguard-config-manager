@@ -25,7 +25,10 @@ pub fn main() !void {
         };
         defer allocator.free(input);
         var tokens = config.tokenIter(allocator, input);
-        const result = try config.eval(&env, &tokens);
+        const result = config.eval(env, &tokens) catch |err| {
+            try stdout.print("=> Error: {s}\n", .{ @errorName(err) });
+            continue;
+        };
         try stdout.print("=> ", .{});
         result.debug();
     }

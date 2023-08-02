@@ -11,8 +11,10 @@ const Environment = struct {
     arena: std.heap.ArenaAllocator,
     bindings: Bindings,
 
-    pub fn deinit(self: Environment) void {
+    pub fn deinit(self: *Environment) void {
+        self.bindings.deinit();
         self.arena.deinit();
+        self.arena.child_allocator.destroy(self);
     }
 
     pub fn allocator(self: *Environment) mem.Allocator {
@@ -52,27 +54,29 @@ test "eval" {
     var iter = tokenIter(testing.allocator, str);
     const str2 = "w";
     var iter2 = tokenIter(testing.allocator, str2);
-    const out = try eval(&env, &iter);
+    const out = try eval(env, &iter);
     std.debug.print("\n\nEVAL\n", .{});
     out.debug();
-    const out2 = try eval(&env, &iter2);
+    const out2 = try eval(env, &iter2);
     std.debug.print("\n\nEVAL2\n", .{});
     out2.debug();
 }
 
-pub fn defaultEnvironment(allocator: mem.Allocator) !Environment {
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    var bindings = Bindings.init(arena.allocator());
-    try bindings.put("def", Value{ .function = def });
-    try bindings.put("interface", Value{ .function = interface });
-    try bindings.put("+", Value{ .function = plus });
-    try bindings.put("-", Value{ .function = minus });
-    try bindings.put("*", Value{ .function = times });
-
-    return .{
-        .arena = arena,
-        .bindings = bindings,
+pub fn defaultEnvironment(allocator: mem.Allocator) !*Environment {
+    var env = try allocator.create(Environment);
+    env.* = .{
+        .arena = std.heap.ArenaAllocator.init(allocator),
+        .bindings = Bindings.init(allocator),
     };
+    try env.bindings.put("def", Value{ .function = def });
+    try env.bindings.put("interface", Value{ .function = interface });
+    try env.bindings.put("+", Value{ .function = plus });
+    try env.bindings.put("-", Value{ .function = minus });
+    try env.bindings.put("*", Value{ .function = times });
+    try env.bindings.put("/", Value{ .function = divide });
+    try env.bindings.put("inc", Value{ .function = inc });
+
+    return env;
 }
 
 const Function = *const fn (environment: *Environment, args: []const Value) anyerror!Value;
@@ -115,24 +119,19 @@ pub fn eval(env: *Environment, iter: *TokenIter) !Value {
 
             while (true) {
                 const peeked = try iter.peek() orelse return error.EndOfStream;
-                if (peeked == .list_begin) {
-                    try func_args.append(try eval(env, iter));
-                } else if (peeked == .list_end) {
+                if (peeked == .list_end) {
                     _ = try iter.next();
                     break;
-                } else {
-                    try func_args.append(try eval(env, iter));
                 }
+                try func_args.append(try eval(env, iter));
             }
             return try func_impl(env, try func_args.toOwnedSlice());
         },
         .value => |val| {
-            switch (val) {
-                .identifier => |ident| {
-                    return env.bindings.get(ident) orelse return error.NoBinding;
-                },
-                else => return val,
+            if (val == .identifier) {
+                return env.bindings.get(val.identifier) orelse return error.NoBinding;
             }
+            return val;
         },
         .list_end => return error.UnexpectedListEnd,
     }
@@ -291,15 +290,44 @@ fn times(env: *Environment, args: []const Value) !Value {
     return Value{ .integer = acc };
 }
 
-// fn inc(env: *Environment, args: []const Value) !Value {
-//     if (args.len != 1) {
-//         return error.NumArgsError;
-//     }
-//     if (args[0] != .identifier) {
-//         return error.ArgType;
-//     }
-//     return Value{  }
-// }
+fn divide(env: *Environment, args: []const Value) !Value {
+    _ = env;
+    if (args.len == 0) {
+        return Value{ .integer = 0 };
+    }
+
+    var acc: i64 = if (args[0] == .integer) args[0].integer else return error.ArgType;
+
+    for (args[1..]) |arg| {
+        if (arg != .integer) {
+            return error.ArgType;
+        }
+
+        if (arg.integer == 0) {
+            return error.DivisionByZero;
+        }
+
+        acc = @divFloor(acc, arg.integer);
+    }
+
+    return Value{ .integer = acc };
+}
+
+fn inc(env: *Environment, args: []const Value) !Value {
+    if (args.len != 1) {
+        return error.NumArgsError;
+    }
+    if (args[0] != .identifier) {
+        return error.ArgType;
+    }
+    var stored = env.bindings.get(args[0].identifier) orelse return error.NoBindings;
+    if (stored != .integer) {
+        return error.ArgType;
+    }
+    var new_val = Value{ .integer = stored.integer + 1 };
+    try env.bindings.put(args[0].identifier, new_val);
+    return new_val;
+}
 
 // keypair: KeyPair,
 // name: []const u8,
