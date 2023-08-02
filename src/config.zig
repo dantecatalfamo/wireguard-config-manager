@@ -47,21 +47,6 @@ const Value = union (enum) {
     }
 };
 
-test "eval" {
-    var env = try defaultEnvironment(testing.allocator);
-    defer env.deinit();
-    const str = "(def 'w \"e\")";
-    var iter = tokenIter(testing.allocator, str);
-    const str2 = "w";
-    var iter2 = tokenIter(testing.allocator, str2);
-    const out = try eval(env, &iter);
-    std.debug.print("\n\nEVAL\n", .{});
-    out.debug();
-    const out2 = try eval(env, &iter2);
-    std.debug.print("\n\nEVAL2\n", .{});
-    out2.debug();
-}
-
 pub fn defaultEnvironment(allocator: mem.Allocator) !*Environment {
     var env = try allocator.create(Environment);
     env.* = .{
@@ -224,14 +209,6 @@ pub const TokenIter = struct {
         return token;
     }
 };
-
-test "thing" {
-    const input = "(\"hehe\" 123 :test alphabet)";
-    var iter = tokenIter(input);
-    while (try iter.next()) |token| {
-        std.debug.print("token: {any}\n", .{ token });
-    }
-}
 
 pub const Token = union (enum) {
     list_begin,
