@@ -35,13 +35,13 @@ const Value = union (enum) {
 
     pub fn debug(self: Value) void {
         switch (self) {
-            .interface => |iface| std.debug.print("Interface: #<Interface address=\"{s}\" prefix={d} privkey=\"{s}\">\n",
+            .interface => |iface| std.debug.print("#<Interface address=\"{s}\" prefix={d} privkey=\"{s}\">\n",
                                                   .{iface.address, iface.prefix, iface.keypair.privateBase64()}),
-            .string => |str| std.debug.print("String: {s}\n", .{str}),
-            .integer => |int| std.debug.print("Integer: {d}\n", .{int}),
-            .identifier => |ident| std.debug.print("Identifier: {s}\n", .{ident}),
-            .function => |func| std.debug.print("Function: #<Function @{x}>\n", .{ @intFromPtr(func) }),
-            .symbol => |sym| std.debug.print("Symbol: :{s}\n", .{sym}),
+            .string => |str| std.debug.print("\"{s}\"\n", .{str}),
+            .integer => |int| std.debug.print("{d}\n", .{int}),
+            .identifier => |ident| std.debug.print("'{s}\n", .{ident}),
+            .function => |func| std.debug.print("#<Function @{x}>\n", .{ @intFromPtr(func) }),
+            .symbol => |sym| std.debug.print(":{s}\n", .{sym}),
             .nil => std.debug.print("Nil\n", .{}),
         }
     }
@@ -75,6 +75,7 @@ pub fn defaultEnvironment(allocator: mem.Allocator) !*Environment {
     try env.bindings.put("*", Value{ .function = times });
     try env.bindings.put("/", Value{ .function = divide });
     try env.bindings.put("inc", Value{ .function = inc });
+    try env.bindings.put("concat", Value{ .function = concat });
 
     return env;
 }
@@ -327,6 +328,23 @@ fn inc(env: *Environment, args: []const Value) !Value {
     var new_val = Value{ .integer = stored.integer + 1 };
     try env.bindings.put(args[0].identifier, new_val);
     return new_val;
+}
+
+fn concat(env: *Environment, args: []const Value) !Value {
+    var strings = std.ArrayList([]const u8).init(env.allocator());
+    for (args) |arg| {
+        if (arg == .integer) {
+            const int_str = try std.fmt.allocPrint(env.allocator(), "{d}", .{ arg.integer });
+            try strings.append(int_str);
+            continue;
+        }
+        if (arg != .string) {
+            return error.ArgType;
+        }
+        try strings.append(arg.string);
+    }
+    const new_str = try mem.concat(env.allocator(), u8, strings.items);
+    return Value{ .string = new_str };
 }
 
 // keypair: KeyPair,
