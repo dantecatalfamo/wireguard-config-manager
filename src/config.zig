@@ -23,6 +23,7 @@ const Environment = struct {
 };
 
 const Bindings = std.StringHashMap(Value);
+const ValueList = std.ArrayList(Value);
 
 const Value = union (enum) {
     interface: *Interface,
@@ -31,18 +32,29 @@ const Value = union (enum) {
     identifier: []const u8,
     function: Function,
     symbol: []const u8,
+    vector: []const Value,
     nil,
 
-    pub fn debug(self: Value) void {
+    pub fn toString(self: Value, writer: anytype) !void {
         switch (self) {
-            .interface => |iface| std.debug.print("#<Interface address=\"{s}\" prefix={d} privkey=\"{s}\">\n",
+            .interface => |iface| try writer.print("#<Interface address=\"{s}\" prefix={d} privkey=\"{s}\">",
                                                   .{iface.address, iface.prefix, iface.keypair.privateBase64()}),
-            .string => |str| std.debug.print("\"{s}\"\n", .{str}),
-            .integer => |int| std.debug.print("{d}\n", .{int}),
-            .identifier => |ident| std.debug.print("'{s}\n", .{ident}),
-            .function => |func| std.debug.print("#<Function @{x}>\n", .{ @intFromPtr(func) }),
-            .symbol => |sym| std.debug.print(":{s}\n", .{sym}),
-            .nil => std.debug.print("Nil\n", .{}),
+            .string => |str| try writer.print("\"{s}\"", .{str}),
+            .integer => |int| try writer.print("{d}", .{int}),
+            .identifier => |ident| try writer.print("'{s}", .{ident}),
+            .function => |func| try writer.print("#<Function @{x}>", .{ @intFromPtr(func) }),
+            .symbol => |sym| try writer.print(":{s}", .{sym}),
+            .vector => |vect| {
+                try writer.print("[", .{});
+                for (vect, 0..) |item, idx| {
+                    try item.toString(writer);
+                    if (idx != vect.len-1) {
+                        try writer.print(" ", .{});
+                    }
+                }
+                try writer.print("]", .{});
+            },
+            .nil => try writer.print("nil", .{}),
         }
     }
 };
@@ -61,6 +73,10 @@ pub fn defaultEnvironment(allocator: mem.Allocator) !*Environment {
     try env.bindings.put("/", Value{ .function = divide });
     try env.bindings.put("inc", Value{ .function = inc });
     try env.bindings.put("concat", Value{ .function = concat });
+    try env.bindings.put("t", Value{ .identifier = "t"});
+    try env.bindings.put("nil", Value.nil);
+    try env.bindings.put("eq", Value{ .function = eq });
+    try env.bindings.put("vec", Value{ .function = vec });
 
     return env;
 }
@@ -219,7 +235,7 @@ pub const Token = union (enum) {
 
 fn def(env: *Environment, args: []const Value) !Value {
     if (args.len != 2)
-        return error.NumArgsError;
+        return error.NumArgs;
 
     if (args[0] != .identifier)
         return error.ArgType;
@@ -293,7 +309,7 @@ fn divide(env: *Environment, args: []const Value) !Value {
 
 fn inc(env: *Environment, args: []const Value) !Value {
     if (args.len != 1) {
-        return error.NumArgsError;
+        return error.NumArgs;
     }
     if (args[0] != .identifier) {
         return error.ArgType;
@@ -322,6 +338,54 @@ fn concat(env: *Environment, args: []const Value) !Value {
     }
     const new_str = try mem.concat(env.allocator(), u8, strings.items);
     return Value{ .string = new_str };
+}
+
+fn eq(env: *Environment, args: []const Value) !Value {
+    _ = env;
+    if (args.len < 2) {
+        return error.NumArgs;
+    }
+    const arg1 = args[0];
+    for (args[1..]) |arg| {
+        if (!eqInternal(arg1, arg)) {
+            return nil;
+        }
+    }
+    return t;
+}
+
+pub fn eqInternal(lhs: Value, rhs: Value) bool {
+    if (!mem.eql(u8, @tagName(lhs), @tagName(rhs))) {
+        return false;
+    }
+    switch(lhs) {
+        .nil => return true,
+        .integer => return lhs.integer == rhs.integer,
+        .function => return lhs.function == rhs.function,
+        .string => return mem.eql(u8, lhs.string, rhs.string),
+        .identifier => return mem.eql(u8, lhs.identifier, rhs.identifier),
+        .symbol => return mem.eql(u8, lhs.symbol, rhs.symbol),
+        .interface => return lhs.interface == rhs.interface,
+        .vector => {
+            if (rhs.vector.len != rhs.vector.len) {
+                return false;
+            }
+            for (0..lhs.vector.len) |idx| {
+                if (!eqInternal(lhs.vector[idx], rhs.vector[idx])) {
+                    return false;
+                }
+            }
+            return true;
+        },
+    }
+}
+
+pub const t = Value{ .identifier = "t" };
+pub const nil = Value.nil;
+
+fn vec(env: *Environment, args: []const Value) !Value {
+    _ = env;
+    return Value{ .vector = args };
 }
 
 // keypair: KeyPair,
@@ -365,7 +429,7 @@ fn interface(env: *Environment, args: []const Value) !Value {
 
 pub fn parsePairs(env: *Environment, args: []const Value) ![]Pair {
     if (args.len % 2 != 0) {
-        return error.NumArgsError;
+        return error.NumArgs;
     }
     var pairs = std.ArrayList(Pair).init(env.allocator());
     errdefer pairs.deinit();

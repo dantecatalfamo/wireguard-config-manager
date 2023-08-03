@@ -9,13 +9,14 @@ const keypair = @import("keypair.zig");
 const config = @import("config.zig");
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .enable_memory_limit = true }){};
     var allocator = gpa.allocator();
     const stdin = std.io.getStdIn().reader();
     const stdout = std.io.getStdOut().writer();
     var env = try config.defaultEnvironment(allocator);
     defer env.deinit();
     while (true) {
+        // try stdout.print("Memory allocated: {d} B\n", .{gpa.total_requested_bytes});
         try stdout.print("> ", .{});
         const input = stdin.readUntilDelimiterAlloc(allocator, '\n', 4096) catch |err| {
             if (err == error.EndOfStream) {
@@ -30,7 +31,8 @@ pub fn main() !void {
             continue;
         };
         try stdout.print("=> ", .{});
-        result.debug();
+        try result.toString(stdout);
+        try stdout.print("\n", .{});
     }
 }
 
