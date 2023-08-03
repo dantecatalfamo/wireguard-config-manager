@@ -5,8 +5,6 @@ const testing = std.testing;
 
 const Interface = @import("interface.zig").Interface;
 
-const example = "(def lappy (interface :name \"lappy\" :address \"192.168.100.1\" :prefix 24) :privkey \"whatever\" )";
-
 const Environment = struct {
     arena: std.heap.ArenaAllocator,
     bindings: Bindings,
