@@ -30,7 +30,7 @@ const Value = union (enum) {
     identifier: []const u8,
     function: Function,
     symbol: []const u8,
-    vector: []const Value,
+    list: []const Value,
     nil,
 
     pub fn toString(self: Value, writer: anytype) !void {
@@ -42,15 +42,15 @@ const Value = union (enum) {
             .identifier => |ident| try writer.print("'{s}", .{ident}),
             .function => |func| try writer.print("#<Function @{x}>", .{ @intFromPtr(func) }),
             .symbol => |sym| try writer.print(":{s}", .{sym}),
-            .vector => |vect| {
-                try writer.print("[", .{});
-                for (vect, 0..) |item, idx| {
+            .list => |lst| {
+                try writer.print("(", .{});
+                for (lst, 0..) |item, idx| {
                     try item.toString(writer);
-                    if (idx != vect.len-1) {
+                    if (idx != lst.len-1) {
                         try writer.print(" ", .{});
                     }
                 }
-                try writer.print("]", .{});
+                try writer.print(")", .{});
             },
             .nil => try writer.print("nil", .{}),
         }
@@ -74,7 +74,7 @@ pub fn defaultEnvironment(allocator: mem.Allocator) !*Environment {
     try env.bindings.put("t", Value{ .identifier = "t"});
     try env.bindings.put("nil", Value.nil);
     try env.bindings.put("eq", Value{ .function = eq });
-    try env.bindings.put("vec", Value{ .function = vec });
+    try env.bindings.put("list", Value{ .function = list });
 
     return env;
 }
@@ -364,12 +364,12 @@ pub fn eqInternal(lhs: Value, rhs: Value) bool {
         .identifier => return mem.eql(u8, lhs.identifier, rhs.identifier),
         .symbol => return mem.eql(u8, lhs.symbol, rhs.symbol),
         .interface => return lhs.interface == rhs.interface,
-        .vector => {
-            if (rhs.vector.len != rhs.vector.len) {
+        .list => {
+            if (rhs.list.len != rhs.list.len) {
                 return false;
             }
-            for (0..lhs.vector.len) |idx| {
-                if (!eqInternal(lhs.vector[idx], rhs.vector[idx])) {
+            for (0..lhs.list.len) |idx| {
+                if (!eqInternal(lhs.list[idx], rhs.list[idx])) {
                     return false;
                 }
             }
@@ -381,9 +381,9 @@ pub fn eqInternal(lhs: Value, rhs: Value) bool {
 pub const t = Value{ .identifier = "t" };
 pub const nil = Value.nil;
 
-fn vec(env: *Environment, args: []const Value) !Value {
+fn list(env: *Environment, args: []const Value) !Value {
     _ = env;
-    return Value{ .vector = args };
+    return Value{ .list = args };
 }
 
 // keypair: KeyPair,
