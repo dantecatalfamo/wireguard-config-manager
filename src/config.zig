@@ -85,70 +85,29 @@ pub fn defaultEnvironment(allocator: mem.Allocator) !*Environment {
     return env;
 }
 
-pub fn eval(env: *Environment, iter: *TokenIter) !Value {
-    const token = try iter.next() orelse return Value.nil;
-
-    switch (token) {
-        .quote => {
-            const next = try iter.next() orelse return error.EndOfStream;
-            if (next != .value) {
-                return error.QuotedListNotSupported;
-            }
-            if (next.value != .identifier) {
-                return error.InvalidQuotedItem;
-            }
-            return next.value;
-        },
-        .list_begin => {
-            const func_identifier = blk: {
-                const tok = try iter.next() orelse return error.EndOfStream;
-                if (tok == .list_end) {
-                    return Value.nil;
-                } else if (tok == .list_begin) {
-                    return error.UnexpectedList;
-                }
-                break :blk tok.value;
-            };
-            if (func_identifier != .identifier) {
-                return error.NotAnIdentifier;
-            }
+pub fn eval(env: *Environment, value: Value) !Value {
+    switch (value) {
+        .identifier => |ident| return env.bindings.get(ident) orelse return error.NoBinding,
+        .list => |lst| {
+            if (lst.len == 0) return error.MissingFunction;
             const func = blk: {
-                const env_val = env.bindings.get(func_identifier.identifier) orelse return error.NoBinding;
-                if (env_val != .function) {
-                    return error.NotAFunction;
-                }
-                break :blk env_val.function;
+                const val = try eval(env, lst[0]);
+                if (val != .function) return error.NotAFunction;
+                break :blk val.function;
             };
-            var func_args = std.ArrayList(Value).init(env.allocator());
-
-            while (true) {
-                const peeked = try iter.peek() orelse return error.EndOfStream;
-                if (peeked == .list_end) {
-                    _ = try iter.next();
-                    break;
-                }
+            const args = blk: {
                 if (func.special) {
-                    // TODO
-                    const tok = try iter.next() orelse return error.EndOfStream;
-                    if (tok == .value) {
-                        try func_args.append(tok.value);
-                    } else {
-                        return error.OhShit;
-                    }
-                } else {
-                    try func_args.append(try eval(env, iter));
+                    break :blk lst[1..];
                 }
-
-            }
-            return try func.impl(env, try func_args.toOwnedSlice());
+                var evaled = ValueList.init(env.allocator());
+                for (lst[1..]) |item| {
+                    try evaled.append(try eval(env, item));
+                }
+                break :blk try evaled.toOwnedSlice();
+            };
+            return try func.impl(env, args);
         },
-        .value => |val| {
-            if (val == .identifier) {
-                return env.bindings.get(val.identifier) orelse return error.NoBinding;
-            }
-            return val;
-        },
-        .list_end => return error.UnexpectedListEnd,
+        else => return value,
     }
 }
 
