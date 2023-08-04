@@ -7,14 +7,18 @@ const Interface = @import("interface.zig").Interface;
 
 const Environment = struct {
     arena: std.heap.ArenaAllocator,
-    bindings: Bindings,
+    bindings: BindingList,
 
     pub fn get(self: *Environment, key: []const u8) ?Value {
-        return self.bindings.get(key);
+        var n = self.bindings.items.len;
+        while (n > 0) : (n -= 1) {
+            return self.bindings.items[n-1].get(key) orelse continue;
+        }
+        return null;
     }
 
     pub fn put(self: *Environment, key: []const u8, value: Value) !void {
-        try self.bindings.put(key, value);
+        try self.bindings.items[self.bindings.items.len-1].put(key, value);
     }
 
     pub fn deinit(self: *Environment) void {
@@ -26,8 +30,17 @@ const Environment = struct {
     pub fn allocator(self: *Environment) mem.Allocator {
         return self.arena.allocator();
     }
+
+    pub fn pushBindings(self: *Environment) !void {
+        try self.bindings.append(Bindings.init(self.allocator()));
+    }
+
+    pub fn popBindings(self: *Environment) void {
+        _ = self.bindings.pop();
+    }
 };
 
+const BindingList = std.ArrayList(Bindings);
 const Bindings = std.StringHashMap(Value);
 const ValueList = std.ArrayList(Value);
 
@@ -39,7 +52,7 @@ const Value = union (enum) {
     function: Function,
     symbol: []const u8,
     list: []const Value,
-    lambda: *const Value,
+    lambda: []const Value,
     nil,
 
     pub fn toString(self: Value, writer: anytype) !void {
@@ -63,7 +76,12 @@ const Value = union (enum) {
             },
             .lambda => |lmb| {
                 try writer.print("(lambda ", .{});
-                try lmb.toString(writer);
+                for (lmb, 0..) |item, idx| {
+                    try item.toString(writer);
+                    if (idx != lmb.len-1) {
+                        try writer.print(" ", .{});
+                    }
+                }
                 try writer.print(")", .{});
             },
             .nil => try writer.print("nil", .{}),
@@ -80,8 +98,9 @@ pub fn defaultEnvironment(allocator: mem.Allocator) !*Environment {
     var env = try allocator.create(Environment);
     env.* = .{
         .arena = std.heap.ArenaAllocator.init(allocator),
-        .bindings = Bindings.init(allocator),
+        .bindings = BindingList.init(allocator),
     };
+    try env.pushBindings();
     try env.put("def", Value{ .function = .{ .impl = def }});
     try env.put("interface", Value{ .function = .{ .impl = interface }});
     try env.put("+", Value{ .function = .{ .impl = plus }});
@@ -97,19 +116,30 @@ pub fn defaultEnvironment(allocator: mem.Allocator) !*Environment {
     try env.put("quote", Value{ .function = .{ .impl = quote, .special = true }});
     try env.put("eval", Value{ .function = .{ .impl = eval_fn }});
     try env.put("lambda", Value{ .function = .{ .impl = lambda, .special = true }});
+    try env.put("println", Value{ .function = .{ .impl = println }});
 
     return env;
 }
 
 pub fn eval(env: *Environment, value: Value) !Value {
     switch (value) {
-        .identifier => |ident| return env.get(ident) orelse return error.NoBinding,
+        .identifier => |ident| return {
+            return env.get(ident) orelse return error.NoBinding;
+        },
         .lambda => return value,
         .list => |lst| {
             if (lst.len == 0) return error.MissingFunction;
             const func_ident = try eval(env, lst[0]);
             if (func_ident == .lambda) {
-                return try eval(env, func_ident.lambda.*);
+                try env.pushBindings();
+                defer env.popBindings();
+
+                for (func_ident.lambda, 0..) |item, idx| {
+                    const val = eval(env, item);
+                    if (func_ident.lambda.len-1 == idx) {
+                        return val;
+                    }
+                }
             }
             const func = blk: {
                 const val = func_ident;
@@ -408,7 +438,15 @@ pub fn eqInternal(lhs: Value, rhs: Value) bool {
             return true;
         },
         .lambda => {
-            return eqInternal(lhs.lambda.*, rhs.lambda.*);
+            if (rhs.lambda.len != rhs.lambda.len) {
+                return false;
+            }
+            for (0..lhs.lambda.len) |idx| {
+                if (!eqInternal(lhs.lambda[idx], rhs.lambda[idx])) {
+                    return false;
+                }
+            }
+            return true;
         },
     }
 }
@@ -436,10 +474,23 @@ fn eval_fn(env: *Environment, args: []const Value) !Value {
 
 fn lambda(env: *Environment, args: []const Value) !Value {
     _ = env;
-    if (args.len != 1) {
+    if (args.len == 0) {
         return error.NumArgs;
     }
-    return Value{ .lambda = &args[0] };
+    return Value{ .lambda = args };
+}
+
+fn println(env: *Environment, args: []const Value) !Value {
+    _ = env;
+    if (args.len > 1) {
+        return error.NumArgs;
+    }
+    const writer = std.io.getStdIn().writer();
+    if (args.len == 1) {
+        try args[0].toString(writer);
+    }
+    try writer.print("\n", .{});
+    return nil;
 }
 
 // keypair: KeyPair,
