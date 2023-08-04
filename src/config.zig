@@ -4,6 +4,7 @@ const debug = std.debug;
 const testing = std.testing;
 
 const Interface = @import("interface.zig").Interface;
+const keypair = @import("keypair.zig");
 
 pub const Environment = struct {
     arena: std.heap.ArenaAllocator,
@@ -32,6 +33,10 @@ pub const Environment = struct {
         try env.put("eval", Value{ .function = .{ .impl = eval_fn }});
         try env.put("lambda", Value{ .function = .{ .impl = lambda, .special = true }});
         try env.put("println", Value{ .function = .{ .impl = println }});
+        try env.put("openbsd", Value{ .function = .{ .impl = openbsd }});
+        try env.put("conf", Value{ .function = .{ .impl = conf }});
+        try env.put("gen-privkey", Value{ .function = .{ .impl = genPrivkey }});
+        try env.put("add-peer", Value{ .function = .{ .impl = addPeer }});
 
         return env;
     }
@@ -538,7 +543,50 @@ fn interface(env: *Environment, args: []const Value) !Value {
     var iface = try env.allocator().create(Interface);
     iface.* = try Interface.init(env.allocator(), name.?, privkey_decoded, address.?, prefix.?);
     return Value{ .interface = iface };
+}
 
+fn openbsd(env: *Environment, args: []const Value) !Value {
+    if (args.len != 1) {
+        return error.NumArgs;
+    }
+    if (args[0] != .interface) {
+        return error.ArgType;
+    }
+    var str = std.ArrayList(u8).init(env.allocator());
+    try args[0].interface.toOpenBSD(str.writer());
+    return Value{ .string = try str.toOwnedSlice() };
+}
+
+fn conf(env: *Environment, args: []const Value) !Value {
+    if (args.len != 1) {
+        return error.NumArgs;
+    }
+    if (args[0] != .interface) {
+        return error.ArgType;
+    }
+    var str = std.ArrayList(u8).init(env.allocator());
+    try args[0].interface.toConf(str.writer());
+    return Value{ .string = try str.toOwnedSlice() };
+}
+
+fn genPrivkey(env: *Environment, args: []const Value) !Value {
+    if (args.len != 0) {
+        return error.NumArgs;
+    }
+    const kp = try keypair.generateKeyPair();
+    return Value{ .string = try env.allocator().dupe(u8, &kp.privateBase64()) };
+}
+
+fn addPeer(env: *Environment, args: []const Value) !Value {
+    if (args.len != 2) {
+        return error.NumArgs;
+    }
+    if (args[0] != .interface or args[1] != .interface) {
+        return error.ArgType;
+    }
+    _ = env;
+    try (args[0].interface.addPeer(args[1].interface));
+    return t;
 }
 
 pub fn parsePairs(env: *Environment, args: []const Value) ![]Pair {
