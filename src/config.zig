@@ -31,6 +31,7 @@ const Value = union (enum) {
     function: Function,
     symbol: []const u8,
     list: []const Value,
+    lambda: *const Value,
     nil,
 
     pub fn toString(self: Value, writer: anytype) !void {
@@ -50,6 +51,11 @@ const Value = union (enum) {
                         try writer.print(" ", .{});
                     }
                 }
+                try writer.print(")", .{});
+            },
+            .lambda => |lmb| {
+                try writer.print("(lambda ", .{});
+                try lmb.toString(writer);
                 try writer.print(")", .{});
             },
             .nil => try writer.print("nil", .{}),
@@ -81,6 +87,8 @@ pub fn defaultEnvironment(allocator: mem.Allocator) !*Environment {
     try env.bindings.put("t", Value{ .identifier = "t"});
     try env.bindings.put("nil", Value.nil);
     try env.bindings.put("quote", Value{ .function = .{ .impl = quote, .special = true }});
+    try env.bindings.put("eval", Value{ .function = .{ .impl = eval_fn }});
+    try env.bindings.put("lambda", Value{ .function = .{ .impl = lambda, .special = true }});
 
     return env;
 }
@@ -88,10 +96,15 @@ pub fn defaultEnvironment(allocator: mem.Allocator) !*Environment {
 pub fn eval(env: *Environment, value: Value) !Value {
     switch (value) {
         .identifier => |ident| return env.bindings.get(ident) orelse return error.NoBinding,
+        .lambda => return value,
         .list => |lst| {
             if (lst.len == 0) return error.MissingFunction;
+            const func_ident = try eval(env, lst[0]);
+            if (func_ident == .lambda) {
+                return try eval(env, func_ident.lambda.*);
+            }
             const func = blk: {
-                const val = try eval(env, lst[0]);
+                const val = func_ident;
                 if (val != .function) return error.NotAFunction;
                 break :blk val.function;
             };
@@ -386,6 +399,9 @@ pub fn eqInternal(lhs: Value, rhs: Value) bool {
             }
             return true;
         },
+        .lambda => {
+            return eqInternal(lhs.lambda.*, rhs.lambda.*);
+        },
     }
 }
 
@@ -403,6 +419,19 @@ fn quote(env: *Environment, args: []const Value) !Value {
         return error.NumArgs;
     }
     return args[0];
+}
+
+fn eval_fn(env: *Environment, args: []const Value) !Value {
+    if (args.len != 1) return error.NumArgs;
+    return eval(env, args[0]);
+}
+
+fn lambda(env: *Environment, args: []const Value) !Value {
+    _ = env;
+    if (args.len != 1) {
+        return error.NumArgs;
+    }
+    return Value{ .lambda = &args[0] };
 }
 
 // keypair: KeyPair,
