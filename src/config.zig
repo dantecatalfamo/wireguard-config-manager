@@ -9,8 +9,16 @@ const Environment = struct {
     arena: std.heap.ArenaAllocator,
     bindings: Bindings,
 
+    pub fn get(self: *Environment, key: []const u8) ?Value {
+        return self.bindings.get(key);
+    }
+
+    pub fn put(self: *Environment, key: []const u8, value: Value) !void {
+        try self.bindings.put(key, value);
+    }
+
     pub fn deinit(self: *Environment) void {
-        self.bindings.deinit();
+        self.deinit();
         self.arena.deinit();
         self.arena.child_allocator.destroy(self);
     }
@@ -74,28 +82,28 @@ pub fn defaultEnvironment(allocator: mem.Allocator) !*Environment {
         .arena = std.heap.ArenaAllocator.init(allocator),
         .bindings = Bindings.init(allocator),
     };
-    try env.bindings.put("def", Value{ .function = .{ .impl = def }});
-    try env.bindings.put("interface", Value{ .function = .{ .impl = interface }});
-    try env.bindings.put("+", Value{ .function = .{ .impl = plus }});
-    try env.bindings.put("-", Value{ .function = .{ .impl = minus }});
-    try env.bindings.put("*", Value{ .function = .{ .impl = times }});
-    try env.bindings.put("/", Value{ .function = .{ .impl = divide }});
-    try env.bindings.put("inc", Value{ .function = .{ .impl = inc }});
-    try env.bindings.put("concat", Value{ .function = .{ .impl = concat }});
-    try env.bindings.put("eq", Value{ .function = .{ .impl = eq }});
-    try env.bindings.put("list", Value{ .function = .{ .impl = list }});
-    try env.bindings.put("t", Value{ .identifier = "t"});
-    try env.bindings.put("nil", Value.nil);
-    try env.bindings.put("quote", Value{ .function = .{ .impl = quote, .special = true }});
-    try env.bindings.put("eval", Value{ .function = .{ .impl = eval_fn }});
-    try env.bindings.put("lambda", Value{ .function = .{ .impl = lambda, .special = true }});
+    try env.put("def", Value{ .function = .{ .impl = def }});
+    try env.put("interface", Value{ .function = .{ .impl = interface }});
+    try env.put("+", Value{ .function = .{ .impl = plus }});
+    try env.put("-", Value{ .function = .{ .impl = minus }});
+    try env.put("*", Value{ .function = .{ .impl = times }});
+    try env.put("/", Value{ .function = .{ .impl = divide }});
+    try env.put("inc", Value{ .function = .{ .impl = inc }});
+    try env.put("concat", Value{ .function = .{ .impl = concat }});
+    try env.put("eq", Value{ .function = .{ .impl = eq }});
+    try env.put("list", Value{ .function = .{ .impl = list }});
+    try env.put("t", Value{ .identifier = "t"});
+    try env.put("nil", Value.nil);
+    try env.put("quote", Value{ .function = .{ .impl = quote, .special = true }});
+    try env.put("eval", Value{ .function = .{ .impl = eval_fn }});
+    try env.put("lambda", Value{ .function = .{ .impl = lambda, .special = true }});
 
     return env;
 }
 
 pub fn eval(env: *Environment, value: Value) !Value {
     switch (value) {
-        .identifier => |ident| return env.bindings.get(ident) orelse return error.NoBinding,
+        .identifier => |ident| return env.get(ident) orelse return error.NoBinding,
         .lambda => return value,
         .list => |lst| {
             if (lst.len == 0) return error.MissingFunction;
@@ -262,7 +270,7 @@ fn def(env: *Environment, args: []const Value) !Value {
     if (args[0] != .identifier)
         return error.ArgType;
 
-    try env.bindings.put(args[0].identifier, args[1]);
+    try env.put(args[0].identifier, args[1]);
 
     return args[1];
 }
@@ -336,12 +344,12 @@ fn inc(env: *Environment, args: []const Value) !Value {
     if (args[0] != .identifier) {
         return error.ArgType;
     }
-    var stored = env.bindings.get(args[0].identifier) orelse return error.NoBindings;
+    var stored = env.get(args[0].identifier) orelse return error.NoBindings;
     if (stored != .integer) {
         return error.ArgType;
     }
     var new_val = Value{ .integer = stored.integer + 1 };
-    try env.bindings.put(args[0].identifier, new_val);
+    try env.put(args[0].identifier, new_val);
     return new_val;
 }
 
