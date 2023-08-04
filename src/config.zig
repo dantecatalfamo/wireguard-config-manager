@@ -39,8 +39,8 @@ const Value = union (enum) {
                                                   .{iface.address, iface.prefix, iface.keypair.privateBase64()}),
             .string => |str| try writer.print("\"{s}\"", .{str}),
             .integer => |int| try writer.print("{d}", .{int}),
-            .identifier => |ident| try writer.print("'{s}", .{ident}),
-            .function => |func| try writer.print("#<Function @{x}>", .{ @intFromPtr(func) }),
+            .identifier => |ident| try writer.print("{s}", .{ident}),
+            .function => |func| try writer.print("#<Function @{x}>", .{ @intFromPtr(func.impl) }),
             .symbol => |sym| try writer.print(":{s}", .{sym}),
             .list => |lst| {
                 try writer.print("(", .{});
@@ -57,29 +57,33 @@ const Value = union (enum) {
     }
 };
 
+const Function = struct {
+    impl: *const fn (environment: *Environment, args: []const Value) anyerror!Value,
+    special: bool = false,
+};
+
 pub fn defaultEnvironment(allocator: mem.Allocator) !*Environment {
     var env = try allocator.create(Environment);
     env.* = .{
         .arena = std.heap.ArenaAllocator.init(allocator),
         .bindings = Bindings.init(allocator),
     };
-    try env.bindings.put("def", Value{ .function = def });
-    try env.bindings.put("interface", Value{ .function = interface });
-    try env.bindings.put("+", Value{ .function = plus });
-    try env.bindings.put("-", Value{ .function = minus });
-    try env.bindings.put("*", Value{ .function = times });
-    try env.bindings.put("/", Value{ .function = divide });
-    try env.bindings.put("inc", Value{ .function = inc });
-    try env.bindings.put("concat", Value{ .function = concat });
+    try env.bindings.put("def", Value{ .function = .{ .impl = def }});
+    try env.bindings.put("interface", Value{ .function = .{ .impl = interface }});
+    try env.bindings.put("+", Value{ .function = .{ .impl = plus }});
+    try env.bindings.put("-", Value{ .function = .{ .impl = minus }});
+    try env.bindings.put("*", Value{ .function = .{ .impl = times }});
+    try env.bindings.put("/", Value{ .function = .{ .impl = divide }});
+    try env.bindings.put("inc", Value{ .function = .{ .impl = inc }});
+    try env.bindings.put("concat", Value{ .function = .{ .impl = concat }});
+    try env.bindings.put("eq", Value{ .function = .{ .impl = eq }});
+    try env.bindings.put("list", Value{ .function = .{ .impl = list }});
     try env.bindings.put("t", Value{ .identifier = "t"});
     try env.bindings.put("nil", Value.nil);
-    try env.bindings.put("eq", Value{ .function = eq });
-    try env.bindings.put("list", Value{ .function = list });
+    try env.bindings.put("quote", Value{ .function = .{ .impl = quote, .special = true }});
 
     return env;
 }
-
-const Function = *const fn (environment: *Environment, args: []const Value) anyerror!Value;
 
 pub fn eval(env: *Environment, iter: *TokenIter) !Value {
     const token = try iter.next() orelse return Value.nil;
@@ -96,7 +100,7 @@ pub fn eval(env: *Environment, iter: *TokenIter) !Value {
             return next.value;
         },
         .list_begin => {
-            const func = blk: {
+            const func_identifier = blk: {
                 const tok = try iter.next() orelse return error.EndOfStream;
                 if (tok == .list_end) {
                     return Value.nil;
@@ -105,11 +109,11 @@ pub fn eval(env: *Environment, iter: *TokenIter) !Value {
                 }
                 break :blk tok.value;
             };
-            if (func != .identifier) {
+            if (func_identifier != .identifier) {
                 return error.NotAnIdentifier;
             }
-            const func_impl = blk: {
-                const env_val = env.bindings.get(func.identifier) orelse return error.NoBinding;
+            const func = blk: {
+                const env_val = env.bindings.get(func_identifier.identifier) orelse return error.NoBinding;
                 if (env_val != .function) {
                     return error.NotAFunction;
                 }
@@ -123,9 +127,20 @@ pub fn eval(env: *Environment, iter: *TokenIter) !Value {
                     _ = try iter.next();
                     break;
                 }
-                try func_args.append(try eval(env, iter));
+                if (func.special) {
+                    // TODO
+                    const tok = try iter.next() orelse return error.EndOfStream;
+                    if (tok == .value) {
+                        try func_args.append(tok.value);
+                    } else {
+                        return error.OhShit;
+                    }
+                } else {
+                    try func_args.append(try eval(env, iter));
+                }
+
             }
-            return try func_impl(env, try func_args.toOwnedSlice());
+            return try func.impl(env, try func_args.toOwnedSlice());
         },
         .value => |val| {
             if (val == .identifier) {
@@ -135,6 +150,43 @@ pub fn eval(env: *Environment, iter: *TokenIter) !Value {
         },
         .list_end => return error.UnexpectedListEnd,
     }
+}
+
+pub fn parser(env: *Environment, iter: *TokenIter) !Value {
+    while (try iter.next()) |token| {
+        switch (token) {
+            .list_begin => {
+                var lst = ValueList.init(env.allocator());
+                while (try iter.peek()) |peeked| {
+                    switch (peeked) {
+                        .list_begin, .value, .quote => try lst.append(try parser(env, iter)),
+                        .list_end => {
+                            _ = try iter.next();
+                            return Value{ .list = try lst.toOwnedSlice() };
+                        },
+                    }
+                }
+            },
+            .list_end => return error.UnectedListEnd,
+            .value => return token.value,
+            .quote => {
+                var lst = ValueList.init(env.allocator());
+                try lst.append(Value{ .identifier = "quote" });
+                try lst.append(try parser(env, iter));
+                return Value{ .list = try lst.toOwnedSlice() };
+            },
+        }
+    }
+    return Value.nil;
+}
+
+test "parser" {
+    const test_str = "(a (g) (b (\"hello\" 1 2 3 :e q)) g 'quoted '(quoted list))";
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+    var iter = tokenIter(arena.allocator(), test_str);
+    const value = try parser(try defaultEnvironment(arena.allocator()), &iter);
+    try value.toString(std.io.getStdOut().writer());
 }
 
 pub fn tokenIter(allocator: mem.Allocator, input: []const u8) TokenIter {
@@ -359,7 +411,7 @@ pub fn eqInternal(lhs: Value, rhs: Value) bool {
     switch(lhs) {
         .nil => return true,
         .integer => return lhs.integer == rhs.integer,
-        .function => return lhs.function == rhs.function,
+        .function => return lhs.function.impl == rhs.function.impl,
         .string => return mem.eql(u8, lhs.string, rhs.string),
         .identifier => return mem.eql(u8, lhs.identifier, rhs.identifier),
         .symbol => return mem.eql(u8, lhs.symbol, rhs.symbol),
@@ -384,6 +436,14 @@ pub const nil = Value.nil;
 fn list(env: *Environment, args: []const Value) !Value {
     _ = env;
     return Value{ .list = args };
+}
+
+fn quote(env: *Environment, args: []const Value) !Value {
+    _ = env;
+    if (args.len != 1) {
+        return error.NumArgs;
+    }
+    return args[0];
 }
 
 // keypair: KeyPair,
