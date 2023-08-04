@@ -13,7 +13,7 @@ pub fn main() !void {
     var allocator = gpa.allocator();
     const stdin = std.io.getStdIn().reader();
     const stdout = std.io.getStdOut().writer();
-    var env = try config.defaultEnvironment(allocator);
+    var env = try config.Environment.init(allocator);
     defer env.deinit();
     while (true) {
         // try stdout.print("Memory allocated: {d} B\n", .{gpa.total_requested_bytes});
@@ -25,12 +25,7 @@ pub fn main() !void {
             return err;
         };
         defer allocator.free(input);
-        var iter = config.tokenIter(allocator, input);
-        var parsed = config.parser(env, &iter) catch |err| {
-            try stdout.print("=> Error: {s}\n", .{ @errorName(err) });
-            continue;
-        };
-        const result = config.eval(env, parsed) catch |err| {
+        const result = env.evaluate(input) catch |err| {
             try stdout.print("=> Error: {s}\n", .{ @errorName(err) });
             continue;
         };

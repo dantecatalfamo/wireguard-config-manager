@@ -5,9 +5,43 @@ const testing = std.testing;
 
 const Interface = @import("interface.zig").Interface;
 
-const Environment = struct {
+pub const Environment = struct {
     arena: std.heap.ArenaAllocator,
     bindings: BindingList,
+
+    pub fn init(inner_allocator: mem.Allocator) !*Environment {
+        var env = try inner_allocator.create(Environment);
+        env.* = .{
+            .arena = std.heap.ArenaAllocator.init(inner_allocator),
+            .bindings = BindingList.init(inner_allocator),
+        };
+        try env.pushBindings();
+        try env.put("def", Value{ .function = .{ .impl = def }});
+        try env.put("interface", Value{ .function = .{ .impl = interface }});
+        try env.put("+", Value{ .function = .{ .impl = plus }});
+        try env.put("-", Value{ .function = .{ .impl = minus }});
+        try env.put("*", Value{ .function = .{ .impl = times }});
+        try env.put("/", Value{ .function = .{ .impl = divide }});
+        try env.put("inc", Value{ .function = .{ .impl = inc }});
+        try env.put("concat", Value{ .function = .{ .impl = concat }});
+        try env.put("eq", Value{ .function = .{ .impl = eq }});
+        try env.put("list", Value{ .function = .{ .impl = list }});
+        try env.put("t", Value{ .identifier = "t"});
+        try env.put("nil", Value.nil);
+        try env.put("quote", Value{ .function = .{ .impl = quote, .special = true }});
+        try env.put("eval", Value{ .function = .{ .impl = eval_fn }});
+        try env.put("lambda", Value{ .function = .{ .impl = lambda, .special = true }});
+        try env.put("println", Value{ .function = .{ .impl = println }});
+
+        return env;
+    }
+
+    pub fn evaluate(self: *Environment, input: []const u8) !Value {
+        var iter = tokenIter(self.allocator(), input);
+        var parsed = try parser(self, &iter);
+        return try eval(self, parsed);
+    }
+
 
     pub fn get(self: *Environment, key: []const u8) ?Value {
         var n = self.bindings.items.len;
@@ -22,7 +56,7 @@ const Environment = struct {
     }
 
     pub fn deinit(self: *Environment) void {
-        self.deinit();
+        self.bindings.deinit();
         self.arena.deinit();
         self.arena.child_allocator.destroy(self);
     }
@@ -94,33 +128,6 @@ const Function = struct {
     special: bool = false,
 };
 
-pub fn defaultEnvironment(allocator: mem.Allocator) !*Environment {
-    var env = try allocator.create(Environment);
-    env.* = .{
-        .arena = std.heap.ArenaAllocator.init(allocator),
-        .bindings = BindingList.init(allocator),
-    };
-    try env.pushBindings();
-    try env.put("def", Value{ .function = .{ .impl = def }});
-    try env.put("interface", Value{ .function = .{ .impl = interface }});
-    try env.put("+", Value{ .function = .{ .impl = plus }});
-    try env.put("-", Value{ .function = .{ .impl = minus }});
-    try env.put("*", Value{ .function = .{ .impl = times }});
-    try env.put("/", Value{ .function = .{ .impl = divide }});
-    try env.put("inc", Value{ .function = .{ .impl = inc }});
-    try env.put("concat", Value{ .function = .{ .impl = concat }});
-    try env.put("eq", Value{ .function = .{ .impl = eq }});
-    try env.put("list", Value{ .function = .{ .impl = list }});
-    try env.put("t", Value{ .identifier = "t"});
-    try env.put("nil", Value.nil);
-    try env.put("quote", Value{ .function = .{ .impl = quote, .special = true }});
-    try env.put("eval", Value{ .function = .{ .impl = eval_fn }});
-    try env.put("lambda", Value{ .function = .{ .impl = lambda, .special = true }});
-    try env.put("println", Value{ .function = .{ .impl = println }});
-
-    return env;
-}
-
 pub fn eval(env: *Environment, value: Value) !Value {
     switch (value) {
         .identifier => |ident| return {
@@ -176,6 +183,7 @@ pub fn parser(env: *Environment, iter: *TokenIter) !Value {
                         },
                     }
                 }
+                return error.MissingListEnd;
             },
             .list_end => return error.UnectedListEnd,
             .value => return token.value,
@@ -194,8 +202,9 @@ test "parser" {
     const test_str = "(a (g) (b (\"hello\" 1 2 3 :e q)) g 'quoted '(quoted list))";
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
+    var env = Environment.init(arena.allocator);
     var iter = tokenIter(arena.allocator(), test_str);
-    const value = try parser(try defaultEnvironment(arena.allocator()), &iter);
+    const value = try parser(env, &iter);
     try value.toString(std.io.getStdOut().writer());
 }
 
