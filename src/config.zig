@@ -94,7 +94,7 @@ const Value = union (enum) {
     function: Function,
     symbol: []const u8,
     list: []const Value,
-    lambda: []const Value,
+    lambda: Lambda,
     nil,
 
     pub fn toString(self: Value, writer: anytype) !void {
@@ -118,9 +118,11 @@ const Value = union (enum) {
             },
             .lambda => |lmb| {
                 try writer.print("(lambda ", .{});
-                for (lmb, 0..) |item, idx| {
+                try (Value{ .list = lmb.args }).toString(writer);
+                try writer.print(" ", .{});
+                for (lmb.body, 0..) |item, idx| {
                     try item.toString(writer);
-                    if (idx != lmb.len-1) {
+                    if (idx != lmb.body.len-1) {
                         try writer.print(" ", .{});
                     }
                 }
@@ -129,6 +131,11 @@ const Value = union (enum) {
             .nil => try writer.print("nil", .{}),
         }
     }
+};
+
+const Lambda = struct {
+    args: []const Value,
+    body: []const Value,
 };
 
 const Function = struct {
@@ -146,12 +153,19 @@ pub fn eval(env: *Environment, value: Value) !Value {
             if (lst.len == 0) return error.MissingFunction;
             const func_ident = try eval(env, lst[0]);
             if (func_ident == .lambda) {
+                const lmb = func_ident.lambda;
                 try env.pushBindings();
                 defer env.popBindings();
 
-                for (func_ident.lambda, 0..) |item, idx| {
+                if (lst[1..].len != lmb.args.len) {
+                    return error.NumArgs;
+                }
+                for (lmb.args, lst[1..]) |arg_ident, arg_val| {
+                    try env.put(arg_ident.identifier, arg_val);
+                }
+                for (lmb.body, 0..) |item, idx| {
                     const val = eval(env, item);
-                    if (func_ident.lambda.len-1 == idx) {
+                    if (lmb.body.len-1 == idx) {
                         return val;
                     }
                 }
@@ -506,14 +520,19 @@ pub fn eqInternal(lhs: Value, rhs: Value) bool {
             return true;
         },
         .lambda => {
-            if (rhs.lambda.len != rhs.lambda.len) {
+            if (rhs.lambda.body.len != rhs.lambda.body.len) {
                 return false;
             }
-            for (0..lhs.lambda.len) |idx| {
-                if (!eqInternal(lhs.lambda[idx], rhs.lambda[idx])) {
+            for (rhs.lambda.body, lhs.lambda.body) |rhb, lhb| {
+                if (!eqInternal(rhb, lhb)) {
                     return false;
                 }
             }
+            // for (0..lhs.lambda.len) |idx| {
+            //     if (!eqInternal(lhs.lambda[idx], rhs.lambda[idx])) {
+            //         return false;
+            //     }
+            // }
             return true;
         },
     }
@@ -545,7 +564,15 @@ fn lambda(env: *Environment, args: []const Value) !Value {
     if (args.len == 0) {
         return error.NumArgs;
     }
-    return Value{ .lambda = args };
+    if (args[0] != .list) {
+        return error.ArgType;
+    }
+    for (args[0].list) |arg| {
+        if (arg != .identifier) {
+            return error.ArgType;
+        }
+    }
+    return Value{ .lambda = Lambda{ .args = args[0].list, .body = args[1..] }};
 }
 
 fn println(env: *Environment, args: []const Value) !Value {
