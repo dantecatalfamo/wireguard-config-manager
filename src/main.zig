@@ -25,23 +25,36 @@ pub fn main() !void {
         try stdout.print("\n", .{});
         return;
     }
+
+    var input = std.ArrayList(u8).init(allocator);
     while (true) {
         // try stdout.print("Memory allocated: {d} B\n", .{gpa.total_requested_bytes});
-        try stdout.print("> ", .{});
-        const input = stdin.readUntilDelimiterAlloc(allocator, '\n', 4096) catch |err| {
+        if (input.items.len != 0) {
+            try stdout.print("...> ", .{});
+        } else {
+            try stdout.print("> ", .{});
+        }
+
+        stdin.streamUntilDelimiter(input.writer(), '\n', 4 * 1024 * 1024) catch |err| {
             if (err == error.EndOfStream) {
+                try stdout.print("\n", .{});
                 return;
             }
             return err;
         };
-        defer allocator.free(input);
-        const result = env.load(input) catch |err| {
+        const result = env.load(input.items) catch |err| {
+            if (err == error.MissingListEnd) {
+                try input.append('\n');
+                continue;
+            }
             try stdout.print("=> Error: {s}\n", .{ @errorName(err) });
+            input.clearRetainingCapacity();
             continue;
         };
         try stdout.print("=> ", .{});
         try result.toString(stdout);
         try stdout.print("\n", .{});
+        input.clearRetainingCapacity();
     }
 }
 
