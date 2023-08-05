@@ -28,10 +28,11 @@ pub const Environment = struct {
         try env.put(">>", Value{ .function = .{ .impl = shr }});
         try env.put("inc", Value{ .function = .{ .impl = inc }});
         try env.put("concat", Value{ .function = .{ .impl = concat }});
-        try env.put("eq", Value{ .function = .{ .impl = eq }});
+        try env.put("=", Value{ .function = .{ .impl = eq }});
         try env.put("list", Value{ .function = .{ .impl = list }});
         try env.put("t", Value{ .identifier = "t"});
         try env.put("nil", Value.nil);
+        try env.put("if", Value{ .function = .{ .impl = if_fn, .special = true }});
         try env.put("quote", Value{ .function = .{ .impl = quote, .special = true }});
         try env.put("eval", Value{ .function = .{ .impl = eval_fn }});
         try env.put("lambda", Value{ .function = .{ .impl = lambda, .special = true }});
@@ -573,6 +574,20 @@ fn lambda(env: *Environment, args: []const Value) !Value {
         }
     }
     return Value{ .lambda = Lambda{ .args = args[0].list, .body = args[1..] }};
+}
+
+fn if_fn (env: *Environment, args: []const Value) !Value {
+    if (args.len != 3) {
+        return error.NumArgs;
+    }
+    const condition = args[0];
+    const if_true = args[1];
+    const if_false = args[2];
+
+    if (try eval(env, condition) != Value.nil) {
+        return try eval(env, if_true);
+    }
+    return try eval(env, if_false);
 }
 
 fn println(env: *Environment, args: []const Value) !Value {
