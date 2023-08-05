@@ -23,6 +23,9 @@ pub const Environment = struct {
         try env.put("-", Value{ .function = .{ .impl = minus }});
         try env.put("*", Value{ .function = .{ .impl = times }});
         try env.put("/", Value{ .function = .{ .impl = divide }});
+        try env.put("^", Value{ .function = .{ .impl = pow }});
+        try env.put("<<", Value{ .function = .{ .impl = shl }});
+        try env.put(">>", Value{ .function = .{ .impl = shr }});
         try env.put("inc", Value{ .function = .{ .impl = inc }});
         try env.put("concat", Value{ .function = .{ .impl = concat }});
         try env.put("eq", Value{ .function = .{ .impl = eq }});
@@ -380,6 +383,57 @@ fn divide(env: *Environment, args: []const Value) !Value {
 
     return Value{ .integer = acc };
 }
+
+fn pow(env: *Environment, args: []const Value) !Value {
+    _ = env;
+    if (args.len < 2) {
+        return error.NumArgs;
+    }
+
+    for (args) |arg| {
+        if (arg != .integer) {
+            return error.ArgType;
+        }
+    }
+
+    var acc: i64 = args[0].integer;
+    for (args[1..]) |arg| {
+        acc = std.math.pow(i64, acc, arg.integer);
+    }
+    return Value{ .integer = acc };
+}
+
+fn shl(env: *Environment, args: []const Value) !Value {
+    _ = env;
+    if (args.len != 2) {
+        return error.NumArgs;
+    }
+    if (args[0] != .integer and args[1] != .integer) {
+        return error.ArgType;
+    }
+    if (args[1].integer > std.math.maxInt(u6)) {
+        return error.Overflow;
+    }
+    const out = args[0].integer << @intCast(args[1].integer);
+    return Value{ .integer = out };
+}
+
+fn shr(env: *Environment, args: []const Value) !Value {
+    _ = env;
+    if (args.len != 2) {
+        return error.NumArgs;
+    }
+    if (args[0] != .integer and args[1] != .integer) {
+        return error.ArgType;
+    }
+    if (args[1].integer > std.math.maxInt(u6)) {
+        return error.Overflow;
+    }
+    const out = args[0].integer >> @intCast(args[1].integer);
+    return Value{ .integer = out };
+}
+
+
 
 fn inc(env: *Environment, args: []const Value) !Value {
     if (args.len != 1) {
