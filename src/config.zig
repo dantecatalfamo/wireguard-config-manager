@@ -162,7 +162,7 @@ pub fn eval(env: *Environment, value: Value) !Value {
                     return error.NumArgs;
                 }
                 for (lmb.args, lst[1..]) |arg_ident, arg_val| {
-                    try env.put(arg_ident.identifier, arg_val);
+                    try env.put(arg_ident.identifier, try eval(env, arg_val));
                 }
                 for (lmb.body, 0..) |item, idx| {
                     const val = eval(env, item);
@@ -351,11 +351,17 @@ fn plus(env: *Environment, args: []const Value) !Value {
 
 fn minus(env: *Environment, args: []const Value) !Value {
     _ = env;
-    var acc: i64 = 0;
+    if (args.len == 0) {
+        return error.NumArgs;
+    }
     for (args) |arg| {
         if (arg != .integer) {
             return error.ArgType;
         }
+    }
+    var acc: i64 = if (args.len == 1) 0 else args[0].integer;
+    const begin_index: usize = if (args.len == 1) 0 else 1;
+    for (args[begin_index..]) |arg| {
         acc -= arg.integer;
     }
     return Value{ .integer = acc };
