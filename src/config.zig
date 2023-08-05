@@ -35,6 +35,7 @@ pub const Environment = struct {
         try env.put("if", Value{ .function = .{ .impl = if_fn, .special = true }});
         try env.put("quote", Value{ .function = .{ .impl = quote, .special = true }});
         try env.put("eval", Value{ .function = .{ .impl = eval_fn }});
+        try env.put("progn", Value{ .function = .{ .impl = progn, .special = true }});
         try env.put("lambda", Value{ .function = .{ .impl = lambda, .special = true }});
         try env.put("println", Value{ .function = .{ .impl = println }});
         try env.put("openbsd", Value{ .function = .{ .impl = openbsd }});
@@ -501,6 +502,16 @@ fn eq(env: *Environment, args: []const Value) !Value {
         }
     }
     return t;
+}
+
+fn progn(env: *Environment, args: []const Value) !Value {
+    for (args, 0..) |arg, idx| {
+        const val = eval(env, arg);
+        if (idx == args.len-1) {
+            return val;
+        }
+    }
+    return Value.nil;
 }
 
 pub fn eqInternal(lhs: Value, rhs: Value) bool {
