@@ -29,6 +29,7 @@ pub const Environment = struct {
         try env.put("<<", Value{ .function = .{ .impl = shl }});
         try env.put(">>", Value{ .function = .{ .impl = shr }});
         try env.put("inc", Value{ .function = .{ .impl = inc }});
+        try env.put("dec", Value{ .function = .{ .impl = dec }});
         try env.put("concat", Value{ .function = .{ .impl = concat }});
         try env.put("=", Value{ .function = .{ .impl = eq }});
         try env.put("list", Value{ .function = .{ .impl = list }});
@@ -523,6 +524,22 @@ fn inc(env: *Environment, args: []const Value) !Value {
         return error.ArgType;
     }
     var new_val = Value{ .integer = stored.integer + 1 };
+    try env.put(args[0].identifier, new_val);
+    return new_val;
+}
+
+fn dec(env: *Environment, args: []const Value) !Value {
+    if (args.len != 1) {
+        return error.NumArgs;
+    }
+    if (args[0] != .identifier) {
+        return error.ArgType;
+    }
+    var stored = env.get(args[0].identifier) orelse return error.NoBindings;
+    if (stored != .integer) {
+        return error.ArgType;
+    }
+    var new_val = Value{ .integer = stored.integer - 1 };
     try env.put(args[0].identifier, new_val);
     return new_val;
 }
