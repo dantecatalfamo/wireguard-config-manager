@@ -46,10 +46,14 @@ pub const Environment = struct {
         return env;
     }
 
-    pub fn evaluate(self: *Environment, input: []const u8) !Value {
+    pub fn load(self: *Environment, input: []const u8) !Value {
         var iter = tokenIter(self.allocator(), input);
-        var parsed = try parser(self, &iter);
-        return try eval(self, parsed);
+        var last_eval: ?Value = null;
+        while (try iter.peek() != null) {
+            var parsed = try parser(self, &iter);
+            last_eval = try eval(self, parsed);
+        }
+        return if (last_eval != null) last_eval.? else Value.nil;
     }
 
 

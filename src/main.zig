@@ -15,6 +15,16 @@ pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
     var env = try config.Environment.init(allocator);
     defer env.deinit();
+
+    var args = std.process.args();
+    _ = args.next();
+    if (args.next()) |filepath| {
+        const contents = try std.fs.cwd().readFileAlloc(allocator, filepath, 1024 * 1024);
+        const result = try env.load(contents);
+        try result.toString(stdout);
+        try stdout.print("\n", .{});
+        return;
+    }
     while (true) {
         // try stdout.print("Memory allocated: {d} B\n", .{gpa.total_requested_bytes});
         try stdout.print("> ", .{});
@@ -25,7 +35,7 @@ pub fn main() !void {
             return err;
         };
         defer allocator.free(input);
-        const result = env.evaluate(input) catch |err| {
+        const result = env.load(input) catch |err| {
             try stdout.print("=> Error: {s}\n", .{ @errorName(err) });
             continue;
         };
