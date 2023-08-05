@@ -9,6 +9,8 @@ const keypair = @import("keypair.zig");
 pub const Environment = struct {
     arena: std.heap.ArenaAllocator,
     bindings: BindingList,
+    trace: bool = false,
+    trace_depth: u32 = 0,
 
     pub fn init(inner_allocator: mem.Allocator) !*Environment {
         var env = try inner_allocator.create(Environment);
@@ -42,6 +44,7 @@ pub const Environment = struct {
         try env.put("conf", Value{ .function = .{ .impl = conf }});
         try env.put("gen-privkey", Value{ .function = .{ .impl = genPrivkey }});
         try env.put("add-peer", Value{ .function = .{ .impl = addPeer }});
+        try env.put("trace", Value{ .function = .{ .impl = trace }});
 
         return env;
     }
@@ -158,21 +161,55 @@ pub fn eval(env: *Environment, value: Value) !Value {
         .list => |lst| {
             if (lst.len == 0) return error.MissingFunction;
             const func_ident = try eval(env, lst[0]);
+            if (env.trace) {
+                std.debug.print("Trace ", .{});
+                for (env.trace_depth) |_| {
+                    std.debug.print("  ", .{});
+                }
+                std.debug.print("\x1b[1;32m->\x1b[0m ", .{});
+                env.trace_depth += 1;
+                try lst[0].toString(std.io.getStdErr().writer());
+                std.debug.print(": ", .{});
+                for (lst[1..], 0..) |arg, idx| {
+                    try arg.toString(std.io.getStdErr().writer());
+                    if (idx != lst.len-1) {
+                        std.debug.print(" ", .{});
+                    }
+                }
+                std.debug.print("\n", .{});
+            }
             if (func_ident == .lambda) {
                 const lmb = func_ident.lambda;
-                try env.pushBindings();
-                defer env.popBindings();
-
                 if (lst[1..].len != lmb.args.len) {
                     return error.NumArgs;
                 }
-                for (lmb.args, lst[1..]) |arg_ident, arg_val| {
-                    try env.put(arg_ident.identifier, try eval(env, arg_val));
+
+                var lmb_args_values = ValueList.init(env.allocator());
+                for (lst[1..]) |arg| {
+                    try lmb_args_values.append(try eval(env, arg));
+                }
+                try env.pushBindings();
+                defer env.popBindings();
+
+                for (lmb.args, lmb_args_values.items) |arg_ident, arg_val| {
+                    try env.put(arg_ident.identifier, arg_val);
                 }
                 for (lmb.body, 0..) |item, idx| {
-                    const val = eval(env, item);
+                    const ret = try eval(env, item);
                     if (lmb.body.len-1 == idx) {
-                        return val;
+                        if (env.trace) {
+                            env.trace_depth -= 1;
+                            std.debug.print("Trace ", .{});
+                            for (env.trace_depth) |_| {
+                                std.debug.print("  ", .{});
+                            }
+                            std.debug.print("\x1b[1;31m<-\x1b[0m ", .{});
+                            try lst[0].toString(std.io.getStdErr().writer());
+                            std.debug.print(": ", .{});
+                            try ret.toString(std.io.getStdErr().writer());
+                            std.debug.print("\n", .{});
+                        }
+                        return ret;
                     }
                 }
             }
@@ -191,7 +228,20 @@ pub fn eval(env: *Environment, value: Value) !Value {
                 }
                 break :blk try evaled.toOwnedSlice();
             };
-            return try func.impl(env, args);
+            const ret = try func.impl(env, args);
+            if (env.trace) {
+                env.trace_depth -= 1;
+                std.debug.print("Trace ", .{});
+                for (env.trace_depth) |_| {
+                    std.debug.print("  ", .{});
+                }
+                std.debug.print("\x1b[1;31m<-\x1b[0m ", .{});
+                try lst[0].toString(std.io.getStdErr().writer());
+                std.debug.print(": ", .{});
+                try ret.toString(std.io.getStdErr().writer());
+                std.debug.print("\n", .{});
+            }
+            return ret;
         },
         else => return value,
     }
@@ -703,6 +753,19 @@ fn addPeer(env: *Environment, args: []const Value) !Value {
     }
     _ = env;
     try (args[0].interface.addPeer(args[1].interface));
+    return t;
+}
+
+fn trace(env: *Environment, args: []const Value) !Value {
+    if (args.len != 1) {
+        return error.NumArgs;
+    }
+    if (args[0] == .nil) {
+        env.trace = false;
+        return nil;
+    }
+    env.trace = true;
+    env.trace_depth += 1;
     return t;
 }
 
