@@ -19,36 +19,47 @@ pub const Environment = struct {
             .bindings = BindingList.init(inner_allocator),
         };
         try env.pushBindings();
-        try env.put("def", Value{ .function = .{ .impl = def }});
-        try env.put("interface", Value{ .function = .{ .impl = interface }});
-        try env.put("+", Value{ .function = .{ .impl = plus }});
-        try env.put("-", Value{ .function = .{ .impl = minus }});
-        try env.put("*", Value{ .function = .{ .impl = times }});
-        try env.put("/", Value{ .function = .{ .impl = divide }});
-        try env.put("^", Value{ .function = .{ .impl = pow }});
-        try env.put("<<", Value{ .function = .{ .impl = shl }});
-        try env.put(">>", Value{ .function = .{ .impl = shr }});
-        try env.put("inc", Value{ .function = .{ .impl = inc }});
-        try env.put("dec", Value{ .function = .{ .impl = dec }});
-        try env.put("concat", Value{ .function = .{ .impl = concat }});
-        try env.put("=", Value{ .function = .{ .impl = eq }});
-        try env.put("list", Value{ .function = .{ .impl = list }});
+        try env.addFunc("def", def, .normal);
+        try env.addFunc("interface", interface, .normal);
+        try env.addFunc("+", plus, .normal);
+        try env.addFunc("-", minus, .normal);
+        try env.addFunc("*", times, .normal);
+        try env.addFunc("/", divide, .normal);
+        try env.addFunc("^", pow, .normal);
+        try env.addFunc("<<", shl, .normal);
+        try env.addFunc(">>", shr, .normal);
+        try env.addFunc("inc", inc, .normal);
+        try env.addFunc("dec", dec, .normal);
+        try env.addFunc("concat", concat, .normal);
+        try env.addFunc("=", eq, .normal);
+        try env.addFunc("list", list, .normal);
+        try env.addFunc("eval", eval_fn, .normal);
+        try env.addFunc("println", println, .normal);
+        try env.addFunc("openbsd", openbsd, .normal);
+        try env.addFunc("conf", conf, .normal);
+        try env.addFunc("gen-privkey", genPrivkey, .normal);
+        try env.addFunc("add-peer", addPeer, .normal);
+        try env.addFunc("trace", trace, .normal);
+
+        try env.addFunc("if", if_fn, .special);
+        try env.addFunc("quote", quote, .special);
+        try env.addFunc("progn", progn, .special);
+        try env.addFunc("lambda", lambda, .special);
+
         try env.put("t", Value{ .identifier = "t"});
         try env.put("nil", Value.nil);
-        try env.put("if", Value{ .function = .{ .impl = if_fn, .special = true }});
-        try env.put("quote", Value{ .function = .{ .impl = quote, .special = true }});
-        try env.put("eval", Value{ .function = .{ .impl = eval_fn }});
-        try env.put("progn", Value{ .function = .{ .impl = progn, .special = true }});
-        try env.put("lambda", Value{ .function = .{ .impl = lambda, .special = true }});
-        try env.put("println", Value{ .function = .{ .impl = println }});
-        try env.put("openbsd", Value{ .function = .{ .impl = openbsd }});
-        try env.put("conf", Value{ .function = .{ .impl = conf }});
-        try env.put("gen-privkey", Value{ .function = .{ .impl = genPrivkey }});
-        try env.put("add-peer", Value{ .function = .{ .impl = addPeer }});
-        try env.put("trace", Value{ .function = .{ .impl = trace }});
 
         return env;
     }
+
+    pub fn addFunc(self: *Environment, name: []const u8, function: *const fn (environment: *Environment, args: []const Value) anyerror!Value, func_type: FunctionType) !void {
+        try self.put(name, Value{ .function = .{ .impl = function, .special = func_type == .special }});
+    }
+
+    pub const FunctionType = enum {
+        normal,
+        special,
+    };
 
     pub fn load(self: *Environment, input: []const u8) !Value {
         var iter = tokenIter(self.allocator(), input);
@@ -253,6 +264,7 @@ pub fn parser(env: *Environment, iter: *TokenIter) !Value {
         switch (token) {
             .list_begin => {
                 var lst = ValueList.init(env.allocator());
+                errdefer lst.deinit();
                 while (try iter.peek()) |peeked| {
                     switch (peeked) {
                         .list_begin, .value, .quote => try lst.append(try parser(env, iter)),
