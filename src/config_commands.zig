@@ -325,33 +325,33 @@ pub fn println(env: *Environment, args: []const Value) !Value {
     return nil;
 }
 
-// keypair: KeyPair,
-// name: []const u8,
-// port: ?u16 = null,
-// hostname: ?[]const u8 = null,
-// address: []const u8,
-// prefix: u6,
-// peers: PeerList,
-// preshared_key: ?[32]u8 = null,
-
 pub fn interface(env: *Environment, args: []const Value) !Value {
     var name: ?[]const u8 = null;
     var address: ?[]const u8 = null;
     var prefix: ?u6 = null;
     var privkey: ?[]const u8 = null;
 
-    const pairs = try parsePairs(env, args);
-    for (pairs) |pair| {
-        if (mem.eql(u8, pair.symbol, "name")) {
-            name = pair.value.string;
-        } else if (mem.eql(u8, pair.symbol, "address")) {
-            address = pair.value.string;
-        } else if (mem.eql(u8, pair.symbol, "prefix")) {
-            prefix = @intCast(pair.value.integer);
-        } else if (mem.eql(u8, pair.symbol, "privkey")) {
-            privkey = pair.value.string;
-        }
+
+    if (try plistValue(args, "name")) |nam|  {
+        if (nam != .string) return error.ArgType;
+        name = nam.string;
     }
+    if (try plistValue(args, "address")) |addr| {
+        if (addr != .string) return error.ArgType;
+        address = addr.string;
+    }
+    if (try plistValue(args, "prefix")) |pre| {
+        if (pre != .integer) return error.ArgType;
+        prefix = @intCast(pre.integer);
+    }
+    if (try plistValue(args, "privkey")) |pk| {
+        if (pk != .string) return error.ArgType;
+        if (pk.string.len != 44) {
+            return error.IncorrectKeyLength;
+        }
+        privkey = pk.string;
+    }
+
     if (name == null or address == null or prefix == null or privkey == null) {
         return error.MissingKeywords;
     }
@@ -360,6 +360,27 @@ pub fn interface(env: *Environment, args: []const Value) !Value {
     try std.base64.standard.Decoder.decode(&privkey_decoded, privkey.?);
     var iface = try env.allocator().create(Interface);
     iface.* = try Interface.init(env.allocator(), name.?, privkey_decoded, address.?, prefix.?);
+
+    if (try plistValue(args, "port")) |port| {
+        if (port != .integer) return error.ArgType;
+        iface.port = @intCast(port.integer);
+    }
+    if (try plistValue(args, "hostname")) |host| {
+        if (host != .string) return error.ArgType;
+        iface.hostname = host.string;
+    }
+    if (try plistValue(args, "preshared")) |psk| {
+        if (psk != .string) return error.ArgType;
+        if (psk.string.len != 44) {
+            std.debug.print("keylen: {d}\n", .{ psk.string.len });
+            return error.IncorrectKeyLength;
+        }
+        var psk_decoded: [32]u8 = undefined;
+        try std.base64.standard.Decoder.decode(&psk_decoded, psk.string);
+        iface.preshared_key = [_]u8{0} ** 32;
+        @memcpy(&iface.preshared_key.?, &psk_decoded);
+    }
+
     return Value{ .interface = iface };
 }
 
@@ -420,23 +441,6 @@ pub fn trace(env: *Environment, args: []const Value) !Value {
     return t;
 }
 
-pub fn parsePairs(env: *Environment, args: []const Value) ![]Pair {
-    if (args.len % 2 != 0) {
-        return error.NumArgs;
-    }
-    var pairs = std.ArrayList(Pair).init(env.allocator());
-    errdefer pairs.deinit();
-
-    for (0..args.len/2) |i| {
-        if (args[i*2] != .symbol) {
-            return error.ArgType;
-        }
-        try pairs.append(.{ .symbol = args[i*2].symbol, .value = args[(i*2)+1] });
-    }
-
-    return pairs.toOwnedSlice();
-}
-
 pub fn typeOf(env: *Environment, args: []const Value) !Value {
     _ = env;
     if (args.len != 1) {
@@ -476,13 +480,20 @@ pub fn plistGet(env: *Environment, args: []const Value) !Value {
     if (args[0] != .symbol or args[1] != .list) {
         return error.ArgType;
     }
-    var pairs = try pairIter(args[1].list);
-    while (try pairs.next()) |pair| {
-        if (mem.eql(u8, args[0].symbol, pair.symbol)) {
+    if (try plistValue(args[1].list, args[0].symbol)) |val| {
+        return val;
+    }
+    return nil;
+}
+
+pub fn plistValue(plist: []const Value, key: []const u8) !?Value {
+    var iter = try pairIter(plist);
+    while (try iter.next()) |pair| {
+        if (mem.eql(u8, key, pair.symbol)) {
             return pair.value;
         }
     }
-    return nil;
+    return null;
 }
 
 pub fn pairIter(args: []const Value) !PairIter {
@@ -524,3 +535,17 @@ pub const Pair = struct {
     symbol: []const u8,
     value: Value,
 };
+
+pub fn nth(env: *Environment, args: []const Value) !Value {
+    _ = env;
+    if (args.len != 2) {
+        return error.NumArgs;
+    }
+    if (args[0] != .integer or args[1] != .list) {
+        return error.ArgType;
+    }
+    if (args[0].integer > args[1].list.len or args[0].integer < 0) {
+        return error.OutOfRange;
+    }
+    return args[1].list[@intCast(args[0].integer)];
+}

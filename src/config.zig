@@ -44,6 +44,7 @@ pub const Environment = struct {
         try env.addFunc("type-of", cmds.typeOf, .normal);
         try env.addFunc("map", cmds.map, .normal);
         try env.addFunc("plist-get", cmds.plistGet, .normal);
+        try env.addFunc("nth", cmds.nth, .normal);
 
         try env.addFunc("if", cmds.if_fn, .special);
         try env.addFunc("quote", cmds.quote, .special);
