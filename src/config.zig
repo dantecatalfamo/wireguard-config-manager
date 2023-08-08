@@ -41,6 +41,9 @@ pub const Environment = struct {
         try env.addFunc("gen-privkey", cmds.genPrivkey, .normal);
         try env.addFunc("add-peer", cmds.addPeer, .normal);
         try env.addFunc("trace", cmds.trace, .normal);
+        try env.addFunc("type-of", cmds.typeOf, .normal);
+        try env.addFunc("map", cmds.map, .normal);
+        try env.addFunc("plist-get", cmds.plistGet, .normal);
 
         try env.addFunc("if", cmds.if_fn, .special);
         try env.addFunc("quote", cmds.quote, .special);
@@ -104,9 +107,9 @@ pub const Environment = struct {
     }
 };
 
-const BindingList = std.ArrayList(Bindings);
-const Bindings = std.StringHashMap(Value);
-const ValueList = std.ArrayList(Value);
+pub const BindingList = std.ArrayList(Bindings);
+pub const Bindings = std.StringHashMap(Value);
+pub const ValueList = std.ArrayList(Value);
 
 pub const Value = union (enum) {
     interface: *Interface,

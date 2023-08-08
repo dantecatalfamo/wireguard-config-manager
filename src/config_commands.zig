@@ -13,6 +13,7 @@ const Environment = config.Environment;
 const Lambda = config.Lambda;
 const Value = config.Value;
 const eval = config.eval;
+const ValueList = config.ValueList;
 
 pub fn def(env: *Environment, args: []const Value) !Value {
     if (args.len != 2)
@@ -435,6 +436,89 @@ pub fn parsePairs(env: *Environment, args: []const Value) ![]Pair {
 
     return pairs.toOwnedSlice();
 }
+
+pub fn typeOf(env: *Environment, args: []const Value) !Value {
+    _ = env;
+    if (args.len != 1) {
+        return error.ArgType;
+    }
+
+    const ident = @tagName(args[0]);
+    return Value{ .identifier = ident };
+}
+
+pub fn map(env: *Environment, args: []const Value) !Value {
+    if (args.len != 2) {
+        return error.NumArgs;
+    }
+    if (args[0] != .identifier and args[0] != .function and args[0] != .lambda) {
+        return error.ArgType;
+    }
+    if (args[1] != .list) {
+        return error.ArgType;
+    }
+    var output = ValueList.init(env.allocator());
+
+    for (args[1].list) |item| {
+        const func = Value{ .list = &.{ args[0], item }};
+        const result = try eval(env, func);
+        try output.append(result);
+    }
+
+    return Value{ .list = try output.toOwnedSlice() };
+}
+
+pub fn plistGet(env: *Environment, args: []const Value) !Value {
+    _ = env;
+    if (args.len != 2) {
+        return error.NumArgs;
+    }
+    if (args[0] != .symbol or args[1] != .list) {
+        return error.ArgType;
+    }
+    var pairs = try pairIter(args[1].list);
+    while (try pairs.next()) |pair| {
+        if (mem.eql(u8, args[0].symbol, pair.symbol)) {
+            return pair.value;
+        }
+    }
+    return nil;
+}
+
+pub fn pairIter(args: []const Value) !PairIter {
+    if (args.len % 2 != 0) {
+        return error.NumArgs;
+    }
+    return .{
+        .args = args,
+        .index = 0,
+    };
+}
+
+pub const PairIter = struct {
+    args: []const Value,
+    index: usize,
+
+    pub fn next(self: *PairIter) !?Pair {
+        if (self.index == self.args.len) {
+            return null;
+        }
+        const symbol = self.args[self.index];
+        if (symbol != .symbol) {
+            return error.ArgType;
+        }
+        const value = self.args[self.index+1];
+        self.index += 2;
+        return Pair{
+            .symbol = symbol.symbol,
+            .value = value,
+        };
+    }
+
+    pub fn reset(self: *PairIter) void {
+        self.index = 0;
+    }
+};
 
 pub const Pair = struct {
     symbol: []const u8,
