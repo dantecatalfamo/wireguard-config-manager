@@ -461,15 +461,15 @@ pub fn map(env: *Environment, args: []const Value) !Value {
     if (args[1] != .list) {
         return error.ArgType;
     }
-    var output = ValueList.init(env.allocator());
+    var output = ValueList{};
 
     for (args[1].list) |item| {
         const func = Value{ .list = &.{ args[0], item }};
         const result = try eval(env, func);
-        try output.append(result);
+        try output.append(env.allocator(), result);
     }
 
-    return Value{ .list = try output.toOwnedSlice() };
+    return Value{ .list = try output.toOwnedSlice(env.allocator()) };
 }
 
 pub fn plistGet(env: *Environment, args: []const Value) !Value {

@@ -86,7 +86,7 @@ pub const Environment = struct {
     }
 
     pub fn put(self: *Environment, key: []const u8, value: Value) !void {
-        try self.bindings.items[self.bindings.items.len-1].put(key, value);
+        try self.bindings.items[self.bindings.items.len-1].put(self.arena.child_allocator, key, value);
     }
 
     pub fn deinit(self: *Environment) void {
@@ -100,17 +100,18 @@ pub const Environment = struct {
     }
 
     pub fn pushBindings(self: *Environment) !void {
-        try self.bindings.append(Bindings.init(self.allocator()));
+        try self.bindings.append(Bindings{});
     }
 
     pub fn popBindings(self: *Environment) void {
-        _ = self.bindings.pop();
+        var binding = self.bindings.pop();
+        binding.deinit(self.arena.child_allocator);
     }
 };
 
 pub const BindingList = std.ArrayList(Bindings);
-pub const Bindings = std.StringHashMap(Value);
-pub const ValueList = std.ArrayList(Value);
+pub const Bindings = std.StringHashMapUnmanaged(Value);
+pub const ValueList = std.ArrayListUnmanaged(Value);
 
 pub const Value = union (enum) {
     interface: *Interface,
@@ -201,9 +202,9 @@ pub fn eval(env: *Environment, value: Value) !Value {
                     return error.NumArgs;
                 }
 
-                var lmb_args_values = ValueList.init(env.allocator());
+                var lmb_args_values = ValueList{};
                 for (lst[1..]) |arg| {
-                    try lmb_args_values.append(try eval(env, arg));
+                    try lmb_args_values.append(env.allocator(), try eval(env, arg));
                 }
                 try env.pushBindings();
                 defer env.popBindings();
@@ -239,11 +240,11 @@ pub fn eval(env: *Environment, value: Value) !Value {
                 if (func.special) {
                     break :blk lst[1..];
                 }
-                var evaled = ValueList.init(env.allocator());
+                var evaled = ValueList{};
                 for (lst[1..]) |item| {
-                    try evaled.append(try eval(env, item));
+                    try evaled.append(env.allocator(), try eval(env, item));
                 }
-                break :blk try evaled.toOwnedSlice();
+                break :blk try evaled.toOwnedSlice(env.allocator());
             };
             const ret = try func.impl(env, args);
             if (env.trace) {
@@ -268,14 +269,14 @@ pub fn parser(env: *Environment, iter: *TokenIter) !Value {
     while (try iter.next()) |token| {
         switch (token) {
             .list_begin => {
-                var lst = ValueList.init(env.allocator());
-                errdefer lst.deinit();
+                var lst = ValueList{};
+                errdefer lst.deinit(env.allocator());
                 while (try iter.peek()) |peeked| {
                     switch (peeked) {
-                        .list_begin, .value, .quote => try lst.append(try parser(env, iter)),
+                        .list_begin, .value, .quote => try lst.append(env.allocator(), try parser(env, iter)),
                         .list_end => {
                             _ = try iter.next();
-                            return Value{ .list = try lst.toOwnedSlice() };
+                            return Value{ .list = try lst.toOwnedSlice(env.allocator()) };
                         },
                     }
                 }
@@ -284,10 +285,10 @@ pub fn parser(env: *Environment, iter: *TokenIter) !Value {
             .list_end => return error.UnectedListEnd,
             .value => return token.value,
             .quote => {
-                var lst = ValueList.init(env.allocator());
-                try lst.append(Value{ .identifier = "quote" });
-                try lst.append(try parser(env, iter));
-                return Value{ .list = try lst.toOwnedSlice() };
+                var lst = ValueList{};
+                try lst.append(env.allocator(), Value{ .identifier = "quote" });
+                try lst.append(env.allocator(), try parser(env, iter));
+                return Value{ .list = try lst.toOwnedSlice(env.allocator()) };
             },
         }
     }
