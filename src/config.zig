@@ -45,6 +45,9 @@ pub const Environment = struct {
         try env.addFunc("map", cmds.map, .normal);
         try env.addFunc("plist-get", cmds.plistGet, .normal);
         try env.addFunc("nth", cmds.nth, .normal);
+        try env.addFunc("arena-capacity", cmds.arenaCapacity, .normal);
+        try env.addFunc("first", cmds.first, .normal);
+        try env.addFunc("rest", cmds.rest, .normal);
 
         try env.addFunc("if", cmds.if_fn, .special);
         try env.addFunc("quote", cmds.quote, .special);

@@ -549,3 +549,33 @@ pub fn nth(env: *Environment, args: []const Value) !Value {
     }
     return args[1].list[@intCast(args[0].integer)];
 }
+
+pub fn arenaCapacity(env: *Environment, args: []const Value) !Value {
+    _ = args;
+    return Value{ .integer = @intCast(env.arena.queryCapacity()) };
+}
+
+pub fn first(env: *Environment, args: []const Value) !Value {
+    _ = env;
+    if (args.len != 1) {
+        return error.NumArgs;
+    }
+    if (args[0] != .list) {
+        return error.ArgType;
+    }
+    return args[0].list[0];
+}
+
+pub fn rest(env: *Environment, args: []const Value) !Value {
+    _ = env;
+    if (args.len != 1) {
+        return error.NumArgs;
+    }
+    if (args[0] != .list) {
+        return error.ArgType;
+    }
+    if (args[0].list.len == 0) {
+        return Value{ .list = &.{} };
+    }
+    return Value{ .list = args[0].list[1..] };
+}
