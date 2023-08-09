@@ -8,6 +8,7 @@ const keypair = @import("keypair.zig");
 const cmds = @import("config_commands.zig");
 
 pub const Environment = struct {
+    counting: CountingAllocator,
     arena: std.heap.ArenaAllocator,
     bindings: BindingList,
     trace: bool = false,
@@ -15,10 +16,11 @@ pub const Environment = struct {
 
     pub fn init(inner_allocator: mem.Allocator) !*Environment {
         var env = try inner_allocator.create(Environment);
-        env.* = .{
-            .arena = std.heap.ArenaAllocator.init(inner_allocator),
-            .bindings = BindingList.init(inner_allocator),
-        };
+        env.counting = countingAllocator(inner_allocator);
+        env.counting.count += @sizeOf(Environment);
+        env.arena = std.heap.ArenaAllocator.init(env.counting.allocator());
+        env.bindings = BindingList.init(env.counting.allocator());
+
         try env.pushBindings();
         try env.addFunc("def", cmds.def, .normal);
         try env.addFunc("interface", cmds.interface, .normal);
@@ -52,6 +54,7 @@ pub const Environment = struct {
         try env.addFunc("times", cmds.times, .normal);
         try env.addFunc("length", cmds.length, .normal);
         try env.addFunc("append", cmds.append, .normal);
+        try env.addFunc("mem-usage", cmds.memUsage, .normal);
 
         try env.addFunc("if", cmds.if_fn, .special);
         try env.addFunc("quote", cmds.quote, .special);
@@ -411,4 +414,53 @@ pub const Token = union (enum) {
     list_end,
     quote,
     value: Value,
+};
+
+pub fn countingAllocator(backing_allocator: mem.Allocator) CountingAllocator {
+    return CountingAllocator{ .backing_allocator = backing_allocator };
+}
+
+pub const CountingAllocator = struct {
+    backing_allocator: mem.Allocator,
+    count: usize = 0,
+
+    pub fn allocator(self: *CountingAllocator) mem.Allocator {
+        return .{
+            .ptr = self,
+            .vtable = &.{
+                .alloc = alloc,
+                .resize = resize,
+                .free = free,
+            },
+        };
+    }
+
+    fn alloc (ctx: *anyopaque, len: usize, ptr_align: u8, ret_addr: usize) ?[*]u8 {
+        var self: *CountingAllocator = @ptrCast(@alignCast(ctx));
+        const result = self.backing_allocator.rawAlloc(len, ptr_align, ret_addr);
+        if (result != null) {
+            self.count += len;
+        }
+        // std.debug.print("Alloc - {d} - {d}\n", .{ len, self.count });
+        return result;
+    }
+
+    fn resize(ctx: *anyopaque, buf: []u8, buf_align: u8, new_len: usize, ret_addr: usize) bool {
+        var self: *CountingAllocator = @ptrCast(@alignCast(ctx));
+        const buf_len = buf.len;
+        const result = self.backing_allocator.rawResize(buf, buf_align, new_len, ret_addr);
+        if (result) {
+            self.count -= buf_len;
+            self.count += new_len;
+        }
+        // std.debug.print("Resize - {d} -> {d} - {d}\n", .{  buf_len, new_len, self.count });
+        return result;
+    }
+
+    fn free(ctx: *anyopaque, buf: []u8, buf_align: u8, ret_addr: usize) void {
+        var self: *CountingAllocator = @ptrCast(@alignCast(ctx));
+        self.count -= buf.len;
+        // std.debug.print("Free - {d} - {d}\n", .{ buf.len, self.count });
+        self.backing_allocator.rawFree(buf, buf_align, ret_addr);
+    }
 };

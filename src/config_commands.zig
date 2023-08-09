@@ -632,3 +632,8 @@ pub fn append(env: *Environment, args: []const Value) !Value {
     new_list.appendSliceAssumeCapacity(args[1..]);
     return Value{ .list = try new_list.toOwnedSlice(env.allocator()) };
 }
+
+pub fn memUsage(env: *Environment, args: []const Value) !Value {
+    _ = args;
+    return Value{ .integer = @intCast(env.counting.count) };
+}
