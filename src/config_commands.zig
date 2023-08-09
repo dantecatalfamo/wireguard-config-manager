@@ -579,3 +579,18 @@ pub fn rest(env: *Environment, args: []const Value) !Value {
     }
     return Value{ .list = args[0].list[1..] };
 }
+
+pub fn apply(env: *Environment, args: []const Value) !Value {
+    if (args.len != 2) {
+        return error.NumArgs;
+    }
+    if (!args[0].functionIsh() or args[1] != .list) {
+        return error.ArgType;
+    }
+    var expr = ValueList{};
+    try expr.append(env.allocator(), args[0]);
+    for (args[1].list) |item| {
+        try expr.append(env.allocator(), item);
+    }
+    return try eval(env, Value{ .list = try expr.toOwnedSlice(env.allocator()) });
+}

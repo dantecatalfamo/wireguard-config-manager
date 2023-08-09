@@ -48,6 +48,7 @@ pub const Environment = struct {
         try env.addFunc("arena-capacity", cmds.arenaCapacity, .normal);
         try env.addFunc("first", cmds.first, .normal);
         try env.addFunc("rest", cmds.rest, .normal);
+        try env.addFunc("apply", cmds.apply, .normal);
 
         try env.addFunc("if", cmds.if_fn, .special);
         try env.addFunc("quote", cmds.quote, .special);
@@ -163,6 +164,10 @@ pub const Value = union (enum) {
             },
             .nil => try writer.print("nil", .{}),
         }
+    }
+
+    pub fn functionIsh(self: Value) bool {
+        return self == .identifier or self == .function or self == .lambda;
     }
 };
 
