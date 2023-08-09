@@ -487,7 +487,7 @@ pub fn plistGet(env: *Environment, args: []const Value) !Value {
 }
 
 pub fn plistValue(plist: []const Value, key: []const u8) !?Value {
-    var iter = try pairIter(plist);
+    var iter = try plistIter(plist);
     while (try iter.next()) |pair| {
         if (mem.eql(u8, key, pair.symbol)) {
             return pair.value;
@@ -496,7 +496,7 @@ pub fn plistValue(plist: []const Value, key: []const u8) !?Value {
     return null;
 }
 
-pub fn pairIter(args: []const Value) !PairIter {
+pub fn plistIter(args: []const Value) !PlistIter {
     if (args.len % 2 != 0) {
         return error.NumArgs;
     }
@@ -506,11 +506,11 @@ pub fn pairIter(args: []const Value) !PairIter {
     };
 }
 
-pub const PairIter = struct {
+pub const PlistIter = struct {
     args: []const Value,
     index: usize,
 
-    pub fn next(self: *PairIter) !?Pair {
+    pub fn next(self: *PlistIter) !?Pair {
         if (self.index == self.args.len) {
             return null;
         }
@@ -526,7 +526,7 @@ pub const PairIter = struct {
         };
     }
 
-    pub fn reset(self: *PairIter) void {
+    pub fn reset(self: *PlistIter) void {
         self.index = 0;
     }
 };
