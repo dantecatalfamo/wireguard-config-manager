@@ -57,7 +57,7 @@ pub fn minus(env: *Environment, args: []const Value) !Value {
     return Value{ .integer = acc };
 }
 
-pub fn times(env: *Environment, args: []const Value) !Value {
+pub fn mul(env: *Environment, args: []const Value) !Value {
     _ = env;
     if (args.len == 0) {
         return Value{ .integer = 0 };
@@ -593,4 +593,29 @@ pub fn apply(env: *Environment, args: []const Value) !Value {
         try expr.append(env.allocator(), item);
     }
     return try eval(env, Value{ .list = try expr.toOwnedSlice(env.allocator()) });
+}
+
+pub fn times(env: *Environment, args: []const Value) !Value {
+    if (args.len != 2) {
+        return error.NumArgs;
+    }
+    if (args[0] != .integer and !args[1].functionIsh()) {
+        return error.ArgType;
+    }
+    for (0..@intCast(args[0].integer)) |idx| {
+        const expr = [_]Value{ args[1], Value{ .integer = @intCast(idx) } };
+        _ = try eval(env, Value{ .list = &expr });
+    }
+    return Value.nil;
+}
+
+pub fn length(env: *Environment, args: []const Value) !Value {
+    _ = env;
+    if (args.len != 1) {
+        return error.NumArgs;
+    }
+    if (args[0] != .list) {
+        return error.ArgType;
+    }
+    return Value{ .integer = @intCast(args[0].list.len) };
 }

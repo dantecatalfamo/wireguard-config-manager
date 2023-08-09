@@ -24,7 +24,7 @@ pub const Environment = struct {
         try env.addFunc("interface", cmds.interface, .normal);
         try env.addFunc("+", cmds.plus, .normal);
         try env.addFunc("-", cmds.minus, .normal);
-        try env.addFunc("*", cmds.times, .normal);
+        try env.addFunc("*", cmds.mul, .normal);
         try env.addFunc("/", cmds.divide, .normal);
         try env.addFunc("^", cmds.pow, .normal);
         try env.addFunc("<<", cmds.shl, .normal);
@@ -49,6 +49,8 @@ pub const Environment = struct {
         try env.addFunc("first", cmds.first, .normal);
         try env.addFunc("rest", cmds.rest, .normal);
         try env.addFunc("apply", cmds.apply, .normal);
+        try env.addFunc("times", cmds.times, .normal);
+        try env.addFunc("length", cmds.length, .normal);
 
         try env.addFunc("if", cmds.if_fn, .special);
         try env.addFunc("quote", cmds.quote, .special);
