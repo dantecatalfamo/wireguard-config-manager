@@ -90,6 +90,9 @@ pub const Environment = struct {
     }
 
     pub fn deinit(self: *Environment) void {
+        for (self.bindings.items) |*binding| {
+            binding.deinit(self.arena.child_allocator);
+        }
         self.bindings.deinit();
         self.arena.deinit();
         self.arena.child_allocator.destroy(self);
