@@ -619,3 +619,16 @@ pub fn length(env: *Environment, args: []const Value) !Value {
     }
     return Value{ .integer = @intCast(args[0].list.len) };
 }
+
+pub fn append(env: *Environment, args: []const Value) !Value {
+    if (args.len < 2) {
+        return error.NumArgs;
+    }
+    if (args[0] != .list) {
+        return error.ArgType;
+    }
+    var new_list = try ValueList.initCapacity(env.allocator(), args[0].list.len + args[1..].len);
+    new_list.appendSliceAssumeCapacity(args[0].list);
+    new_list.appendSliceAssumeCapacity(args[1..]);
+    return Value{ .list = try new_list.toOwnedSlice(env.allocator()) };
+}

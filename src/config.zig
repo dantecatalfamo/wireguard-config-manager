@@ -51,6 +51,7 @@ pub const Environment = struct {
         try env.addFunc("apply", cmds.apply, .normal);
         try env.addFunc("times", cmds.times, .normal);
         try env.addFunc("length", cmds.length, .normal);
+        try env.addFunc("append", cmds.append, .normal);
 
         try env.addFunc("if", cmds.if_fn, .special);
         try env.addFunc("quote", cmds.quote, .special);
