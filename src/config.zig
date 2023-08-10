@@ -448,7 +448,7 @@ pub const CountingAllocator = struct {
             self.count += len;
         }
         if (self.log) {
-            std.debug.print("Alloc - {d} - {d}\n", .{ len, self.count });
+            std.debug.print("{d:7} - Alloc  {d}\n", .{ self.count, len });
         }
         return result;
     }
@@ -462,7 +462,7 @@ pub const CountingAllocator = struct {
             self.count += new_len;
         }
         if (self.log) {
-            std.debug.print("Resize - {d} -> {d} - {d}\n", .{  buf_len, new_len, self.count });
+            std.debug.print("{d:7} - Resize {d} -> {d}\n", .{  self.count, buf_len, new_len });
         }
         return result;
     }
@@ -471,7 +471,7 @@ pub const CountingAllocator = struct {
         var self: *CountingAllocator = @ptrCast(@alignCast(ctx));
         self.count -= buf.len;
         if (self.log) {
-            std.debug.print("Free - {d} - {d}\n", .{ buf.len, self.count });
+            std.debug.print("{d:7} - Free   {d}\n", .{ self.count, buf.len });
         }
         self.backing_allocator.rawFree(buf, buf_align, ret_addr);
     }
