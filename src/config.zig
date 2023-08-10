@@ -222,9 +222,10 @@ pub fn eval(env: *Environment, value: Value) !Value {
                     return error.NumArgs;
                 }
 
-                var lmb_args_values = ValueList{};
+                var lmb_args_values = try ValueList.initCapacity(env.allocator(), lst[1..].len);
+                errdefer lmb_args_values.deinit(env.allocator());
                 for (lst[1..]) |arg| {
-                    try lmb_args_values.append(env.allocator(), try eval(env, arg));
+                    lmb_args_values.appendAssumeCapacity(try eval(env, arg));
                 }
                 try env.pushBindings();
                 defer env.popBindings();
@@ -260,9 +261,10 @@ pub fn eval(env: *Environment, value: Value) !Value {
                 if (func.special) {
                     break :blk lst[1..];
                 }
-                var evaled = ValueList{};
+                var evaled = try ValueList.initCapacity(env.allocator(), lst[1..].len);
+                errdefer evaled.deinit(env.allocator());
                 for (lst[1..]) |item| {
-                    try evaled.append(env.allocator(), try eval(env, item));
+                    evaled.appendAssumeCapacity(try eval(env, item));
                 }
                 break :blk try evaled.toOwnedSlice(env.allocator());
             };
