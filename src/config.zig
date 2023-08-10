@@ -62,6 +62,10 @@ pub const Environment = struct {
         try env.addFunc("log-allocs", cmds.logAllocs, .normal);
         try env.addFunc("write", cmds.write, .normal);
         try env.addFunc("read", cmds.read, .normal);
+        try env.addFunc("join", cmds.join, .normal);
+        try env.addFunc("cwd", cmds.cwd, .normal);
+        try env.addFunc("last", cmds.last, .normal);
+        try env.addFunc("chars", cmds.chars, .normal);
 
         try env.addFunc("if", cmds.if_fn, .special);
         try env.addFunc("quote", cmds.quote, .special);
@@ -70,6 +74,7 @@ pub const Environment = struct {
 
         try env.put("t", Value{ .identifier = "t"});
         try env.put("nil", Value.nil);
+        try env.put("path-sep", Value{ .string = &[_]u8{std.fs.path.sep} });
 
         return env;
     }

@@ -590,6 +590,44 @@ pub fn read(env: *Environment, args: []const Value) !Value {
     return Value{ .string = contents };
 }
 
+pub fn join(env: *Environment, args: []const Value) !Value {
+    try checkArgs(args, &.{ .string, .list });
+    try checkArgsType(args[1].list, .string);
+
+    const strings = try env.arena.child_allocator.alloc([]const u8, args[1].list.len);
+    defer env.arena.child_allocator.free(strings);
+
+    for (args[1].list, 0..) |val, idx| {
+        strings[idx] = val.string;
+    }
+
+    return Value{ .string = try mem.join(env.allocator(), args[0].string, strings) };
+}
+
+pub fn cwd(env: *Environment, args: []const Value) !Value {
+    try checkArgs(args, &.{});
+
+    const path = try std.process.getCwdAlloc(env.allocator());
+    return Value{ .string = path };
+}
+
+pub fn last(env: *Environment, args: []const Value) !Value {
+    try checkArgs(args, &.{ .list });
+    _ = env;
+    return args[0].list[args[0].list.len-1];
+}
+
+pub fn chars(env: *Environment, args: []const Value) !Value {
+    try checkArgs(args, &.{ .string });
+
+    var char = try ValueList.initCapacity(env.allocator(), args[0].string.len);
+    for (0..args[0].string.len) |idx| {
+        const slice = args[0].string[idx..idx+1];
+        char.appendAssumeCapacity(Value{ .string = slice });
+    }
+    return Value{ .list = try char.toOwnedSlice(env.allocator()) };
+}
+
 /// Same as checkArgs, except it allows more arguments than there are
 /// in `types`, and doesn't check them.
 /// Checks that there are at least `min_args` arguments.
