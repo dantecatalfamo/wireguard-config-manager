@@ -75,6 +75,13 @@ pub fn mul(env: *Environment, args: []const Value) !Value {
     return Value{ .integer = acc };
 }
 
+test mul {
+    try expectEval(testing.allocator, "(*)", Value{ .integer = 0 });
+    try expectEval(testing.allocator, "(* 5)", Value{ .integer = 5 });
+    try expectEval(testing.allocator, "(* 2 3)", Value{ .integer = 6 });
+    try expectEval(testing.allocator, "(* 2 3 4)", Value{ .integer = 24 });
+}
+
 pub fn divide(env: *Environment, args: []const Value) !Value {
     _ = env;
     try checkArgsType(args, .integer);
