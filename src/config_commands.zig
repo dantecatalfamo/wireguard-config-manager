@@ -575,6 +575,21 @@ pub fn logAllocs(env: *Environment, args: []const Value) !Value {
     return t;
 }
 
+pub fn write(env: *Environment, args: []const Value) !Value {
+    _ = env;
+    try checkArgs(args, &.{ .string, .string });
+
+    try fs.cwd().writeFile(args[0].string, args[1].string);
+    return t;
+}
+
+pub fn read(env: *Environment, args: []const Value) !Value {
+    try checkArgs(args, &.{ .string });
+
+    const contents = try fs.cwd().readFileAlloc(env.allocator(), args[0].string, 12 * 1024 * 1024);
+    return Value{ .string = contents };
+}
+
 /// Same as checkArgs, except it allows more arguments than there are
 /// in `types`, and doesn't check them.
 /// Checks that there are at least `min_args` arguments.

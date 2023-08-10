@@ -60,6 +60,8 @@ pub const Environment = struct {
         try env.addFunc("load-string", cmds.loadString, .normal);
         try env.addFunc("load-file", cmds.loadFile, .normal);
         try env.addFunc("log-allocs", cmds.logAllocs, .normal);
+        try env.addFunc("write", cmds.write, .normal);
+        try env.addFunc("read", cmds.read, .normal);
 
         try env.addFunc("if", cmds.if_fn, .special);
         try env.addFunc("quote", cmds.quote, .special);
