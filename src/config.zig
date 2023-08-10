@@ -55,6 +55,9 @@ pub const Environment = struct {
         try env.addFunc("length", cmds.length, .normal);
         try env.addFunc("append", cmds.append, .normal);
         try env.addFunc("mem-usage", cmds.memUsage, .normal);
+        try env.addFunc("load-string", cmds.loadString, .normal);
+        try env.addFunc("load-file", cmds.loadFile, .normal);
+        try env.addFunc("log-allocs", cmds.logAllocs, .normal);
 
         try env.addFunc("if", cmds.if_fn, .special);
         try env.addFunc("quote", cmds.quote, .special);
@@ -423,6 +426,7 @@ pub fn countingAllocator(backing_allocator: mem.Allocator) CountingAllocator {
 pub const CountingAllocator = struct {
     backing_allocator: mem.Allocator,
     count: usize = 0,
+    log: bool = false,
 
     pub fn allocator(self: *CountingAllocator) mem.Allocator {
         return .{
@@ -441,7 +445,9 @@ pub const CountingAllocator = struct {
         if (result != null) {
             self.count += len;
         }
-        // std.debug.print("Alloc - {d} - {d}\n", .{ len, self.count });
+        if (self.log) {
+            std.debug.print("Alloc - {d} - {d}\n", .{ len, self.count });
+        }
         return result;
     }
 
@@ -453,14 +459,18 @@ pub const CountingAllocator = struct {
             self.count -= buf_len;
             self.count += new_len;
         }
-        // std.debug.print("Resize - {d} -> {d} - {d}\n", .{  buf_len, new_len, self.count });
+        if (self.log) {
+            std.debug.print("Resize - {d} -> {d} - {d}\n", .{  buf_len, new_len, self.count });
+        }
         return result;
     }
 
     fn free(ctx: *anyopaque, buf: []u8, buf_align: u8, ret_addr: usize) void {
         var self: *CountingAllocator = @ptrCast(@alignCast(ctx));
         self.count -= buf.len;
-        // std.debug.print("Free - {d} - {d}\n", .{ buf.len, self.count });
+        if (self.log) {
+            std.debug.print("Free - {d} - {d}\n", .{ buf.len, self.count });
+        }
         self.backing_allocator.rawFree(buf, buf_align, ret_addr);
     }
 };

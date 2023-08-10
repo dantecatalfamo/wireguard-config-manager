@@ -637,3 +637,39 @@ pub fn memUsage(env: *Environment, args: []const Value) !Value {
     _ = args;
     return Value{ .integer = @intCast(env.counting.count) };
 }
+
+pub fn loadFile(env: *Environment, args: []const Value) !Value {
+    if (args.len != 1) {
+        return error.NumArgs;
+    }
+    if (args[0] != .string) {
+        return error.ArgType;
+    }
+    const allocator = env.arena.child_allocator;
+    const file_contents = try fs.cwd().readFileAlloc(allocator, args[0].string, 12 * 1024 * 1024);
+    defer allocator.free(file_contents);
+    return try env.load(file_contents);
+}
+
+pub fn loadString(env: *Environment, args: []const Value) !Value {
+    if (args.len != 1) {
+        return error.NumArgs;
+    }
+    if (args[0] != .string) {
+        return error.ArgType;
+    }
+    return try env.load(args[0].string);
+}
+
+
+pub fn logAllocs(env: *Environment, args: []const Value) !Value {
+    if (args.len != 1) {
+        return error.NumArgs;
+    }
+    if (args[0] == .nil) {
+        env.counting.log = false;
+        return nil;
+    }
+    env.counting.log = true;
+    return t;
+}
