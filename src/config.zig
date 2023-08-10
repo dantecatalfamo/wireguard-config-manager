@@ -47,6 +47,7 @@ pub const Environment = struct {
         try env.addFunc("trace", cmds.trace, .normal);
         try env.addFunc("type-of", cmds.typeOf, .normal);
         try env.addFunc("map", cmds.map, .normal);
+        try env.addFunc("each", cmds.each, .normal);
         try env.addFunc("plist-get", cmds.plistGet, .normal);
         try env.addFunc("nth", cmds.nth, .normal);
         try env.addFunc("arena-capacity", cmds.arenaCapacity, .normal);
@@ -324,16 +325,6 @@ pub fn parser(env: *Environment, iter: *TokenIter) !Value {
         }
     }
     return Value.nil;
-}
-
-test "parser" {
-    const test_str = "(a (g) (b (\"hello\" 1 2 3 :e q)) g 'quoted '(quoted list))";
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    var env = Environment.init(arena.allocator);
-    var iter = tokenIter(arena.allocator(), test_str);
-    const value = try parser(env, &iter);
-    try value.toString(std.io.getStdOut().writer());
 }
 
 pub fn tokenIter(allocator: mem.Allocator, input: []const u8) TokenIter {

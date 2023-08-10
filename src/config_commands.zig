@@ -33,10 +33,17 @@ pub fn plus(env: *Environment, args: []const Value) !Value {
     return Value{ .integer = acc };
 }
 
+test plus {
+    try expectEval(testing.allocator, "(+)", Value{ .integer = 0 });
+    try expectEval(testing.allocator, "(+ 5)", Value{ .integer = 5 });
+    try expectEval(testing.allocator, "(+ 1 2)", Value{ .integer = 3 });
+    try expectEval(testing.allocator, "(+ 1 2 3 4)", Value{ .integer = 10 });
+}
+
 pub fn minus(env: *Environment, args: []const Value) !Value {
     _ = env;
     try checkArgsType(args, .integer);
-    if (args.len == 0) return error.NumArgs;
+    if (args.len == 0) return Value{ .integer = -0 };
     if (args.len == 1) return Value{ .integer = -args[0].integer };
 
     var acc = args[0].integer;
@@ -44,6 +51,14 @@ pub fn minus(env: *Environment, args: []const Value) !Value {
         acc -= arg.integer;
     }
     return Value{ .integer = acc };
+}
+
+test minus {
+    try expectEval(testing.allocator, "(-)", Value{ .integer = 0 });
+    try expectEval(testing.allocator, "(- 5)", Value{ .integer = -5 });
+    try expectEval(testing.allocator, "(- 1 2)", Value{ .integer = -1 });
+    try expectEval(testing.allocator, "(- 2 1)", Value{ .integer = 1 });
+    try expectEval(testing.allocator, "(- 1 2 3 4)", Value{ .integer = -8 });
 }
 
 pub fn mul(env: *Environment, args: []const Value) !Value {
@@ -406,6 +421,20 @@ pub fn map(env: *Environment, args: []const Value) !Value {
     return Value{ .list = try output.toOwnedSlice(env.allocator()) };
 }
 
+pub fn each(env: *Environment, args: []const Value) !Value {
+    try checkArgs(args, &.{ null, .list });
+    if (!args[0].functionIsh()) {
+        return error.ArgType;
+    }
+
+    for (args[1].list) |item| {
+        const func = Value{ .list = &.{ args[0], item }};
+        _ = try eval(env, func);
+    }
+
+    return t;
+}
+
 pub fn plistGet(env: *Environment, args: []const Value) !Value {
     _ = env;
     try checkArgs(args, &.{ .symbol, .list });
@@ -671,3 +700,12 @@ pub fn checkArgs(args: []const Value, types: []const ?ArgType) !void {
 }
 
 pub const ArgType = @typeInfo(Value).Union.tag_type.?;
+
+pub fn expectEval(allocator: mem.Allocator, input: []const u8, expected: Value) !void {
+    var env = try Environment.init(allocator);
+    defer env.deinit();
+    const output = try env.load(input);
+    if (!eqInternal(output, expected)) {
+        return error.NotEqual;
+    }
+}

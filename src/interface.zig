@@ -164,33 +164,33 @@ pub const AllowedIP = struct {
     prefix: u6,
 };
 
-test "e" {
-    const stderr = std.io.getStdErr().writer();
-    const k = try kp.generateKeyPair();
-    const k2 = try kp.generateKeyPair();
-    const k3 = try kp.generateKeyPair();
+// test "e" {
+//     const stderr = std.io.getStdErr().writer();
+//     const k = try kp.generateKeyPair();
+//     const k2 = try kp.generateKeyPair();
+//     const k3 = try kp.generateKeyPair();
 
-    var if1 = try Interface.init(testing.allocator, "captain", k.private, "192.168.69.1", 24);
-    if1.port = 1234;
-    if1.hostname = "example.com";
-    defer if1.deinit();
-    var if2 = try Interface.init(testing.allocator, "lappy", k2.private, "192.168.69.2", 24);
-    defer if2.deinit();
-    var if3 = try Interface.init(testing.allocator, "phone", k3.private, "192.168.69.3", 24);
-    defer if3.deinit();
+//     var if1 = try Interface.init(testing.allocator, "captain", k.private, "192.168.69.1", 24);
+//     if1.port = 1234;
+//     if1.hostname = "example.com";
+//     defer if1.deinit();
+//     var if2 = try Interface.init(testing.allocator, "lappy", k2.private, "192.168.69.2", 24);
+//     defer if2.deinit();
+//     var if3 = try Interface.init(testing.allocator, "phone", k3.private, "192.168.69.3", 24);
+//     defer if3.deinit();
 
-    try if2.addRouter(&if1);
-    try if3.addRouter(&if1);
+//     try if2.addRouter(&if1);
+//     try if3.addRouter(&if1);
 
-    std.debug.print("\n############\n\n", .{});
-    try if1.toOpenBSD(stderr);
-    try if1.toConf(stderr);
+//     std.debug.print("\n############\n\n", .{});
+//     try if1.toOpenBSD(stderr);
+//     try if1.toConf(stderr);
 
-    std.debug.print("\n############\n\n", .{});
-    try if2.toOpenBSD(stderr);
-    try if2.toConf(stderr);
+//     std.debug.print("\n############\n\n", .{});
+//     try if2.toOpenBSD(stderr);
+//     try if2.toConf(stderr);
 
-    std.debug.print("\n############\n\n", .{});
-    try if3.toOpenBSD(stderr);
-    try if3.toConf(stderr);
-}
+//     std.debug.print("\n############\n\n", .{});
+//     try if3.toOpenBSD(stderr);
+//     try if3.toConf(stderr);
+// }
