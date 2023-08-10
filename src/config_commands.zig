@@ -16,24 +16,18 @@ const eval = config.eval;
 const ValueList = config.ValueList;
 
 pub fn def(env: *Environment, args: []const Value) !Value {
-    if (args.len != 2)
-        return error.NumArgs;
-
-    if (args[0] != .identifier)
-        return error.ArgType;
+    try checkArgs(args, &.{ .identifier, null });
 
     try env.put(args[0].identifier, args[1]);
-
     return args[1];
 }
 
 pub fn plus(env: *Environment, args: []const Value) !Value {
     _ = env;
+    try checkArgsType(args, .integer);
+
     var acc: i64 = 0;
     for (args) |arg| {
-        if (arg != .integer) {
-            return error.ArgType;
-        }
         acc += arg.integer;
     }
     return Value{ .integer = acc };
@@ -41,17 +35,12 @@ pub fn plus(env: *Environment, args: []const Value) !Value {
 
 pub fn minus(env: *Environment, args: []const Value) !Value {
     _ = env;
-    if (args.len == 0) {
-        return error.NumArgs;
-    }
-    for (args) |arg| {
-        if (arg != .integer) {
-            return error.ArgType;
-        }
-    }
-    var acc: i64 = if (args.len == 1) 0 else args[0].integer;
-    const begin_index: usize = if (args.len == 1) 0 else 1;
-    for (args[begin_index..]) |arg| {
+    try checkArgsType(args, .integer);
+    if (args.len == 0) return error.NumArgs;
+    if (args.len == 1) return Value{ .integer = -args[0].integer };
+
+    var acc = args[0].integer;
+    for (args[1..]) |arg| {
         acc -= arg.integer;
     }
     return Value{ .integer = acc };
@@ -59,14 +48,13 @@ pub fn minus(env: *Environment, args: []const Value) !Value {
 
 pub fn mul(env: *Environment, args: []const Value) !Value {
     _ = env;
+    try checkArgsType(args, .integer);
     if (args.len == 0) {
         return Value{ .integer = 0 };
     }
-    var acc: i64 = if (args[0] == .integer) args[0].integer else return error.ArgType;
+
+    var acc = args[0].integer;
     for (args[1..]) |arg| {
-        if (arg != .integer) {
-            return error.ArgType;
-        }
         acc *= arg.integer;
     }
     return Value{ .integer = acc };
@@ -74,21 +62,16 @@ pub fn mul(env: *Environment, args: []const Value) !Value {
 
 pub fn divide(env: *Environment, args: []const Value) !Value {
     _ = env;
+    try checkArgsType(args, .integer);
     if (args.len == 0) {
         return Value{ .integer = 0 };
     }
 
-    var acc: i64 = if (args[0] == .integer) args[0].integer else return error.ArgType;
-
+    var acc = args[0].integer;
     for (args[1..]) |arg| {
-        if (arg != .integer) {
-            return error.ArgType;
-        }
-
         if (arg.integer == 0) {
             return error.DivisionByZero;
         }
-
         acc = @divFloor(acc, arg.integer);
     }
 
@@ -97,15 +80,7 @@ pub fn divide(env: *Environment, args: []const Value) !Value {
 
 pub fn pow(env: *Environment, args: []const Value) !Value {
     _ = env;
-    if (args.len < 2) {
-        return error.NumArgs;
-    }
-
-    for (args) |arg| {
-        if (arg != .integer) {
-            return error.ArgType;
-        }
-    }
+    try checkArgs(args, &.{ .integer, .integer });
 
     var acc: i64 = args[0].integer;
     for (args[1..]) |arg| {
@@ -116,12 +91,8 @@ pub fn pow(env: *Environment, args: []const Value) !Value {
 
 pub fn shl(env: *Environment, args: []const Value) !Value {
     _ = env;
-    if (args.len != 2) {
-        return error.NumArgs;
-    }
-    if (args[0] != .integer and args[1] != .integer) {
-        return error.ArgType;
-    }
+    try checkArgs(args, &.{ .integer, .integer });
+
     if (args[1].integer > std.math.maxInt(u6)) {
         return error.Overflow;
     }
@@ -131,12 +102,8 @@ pub fn shl(env: *Environment, args: []const Value) !Value {
 
 pub fn shr(env: *Environment, args: []const Value) !Value {
     _ = env;
-    if (args.len != 2) {
-        return error.NumArgs;
-    }
-    if (args[0] != .integer and args[1] != .integer) {
-        return error.ArgType;
-    }
+    try checkArgs(args, &.{ .integer, .integer });
+
     if (args[1].integer > std.math.maxInt(u6)) {
         return error.Overflow;
     }
@@ -147,12 +114,8 @@ pub fn shr(env: *Environment, args: []const Value) !Value {
 
 
 pub fn inc(env: *Environment, args: []const Value) !Value {
-    if (args.len != 1) {
-        return error.NumArgs;
-    }
-    if (args[0] != .identifier) {
-        return error.ArgType;
-    }
+    try checkArgs(args, &.{ .identifier });
+
     var stored = env.get(args[0].identifier) orelse return error.NoBindings;
     if (stored != .integer) {
         return error.ArgType;
@@ -163,12 +126,8 @@ pub fn inc(env: *Environment, args: []const Value) !Value {
 }
 
 pub fn dec(env: *Environment, args: []const Value) !Value {
-    if (args.len != 1) {
-        return error.NumArgs;
-    }
-    if (args[0] != .identifier) {
-        return error.ArgType;
-    }
+    try checkArgs(args, &.{ .identifier });
+
     var stored = env.get(args[0].identifier) orelse return error.NoBindings;
     if (stored != .integer) {
         return error.ArgType;
@@ -180,6 +139,8 @@ pub fn dec(env: *Environment, args: []const Value) !Value {
 
 pub fn concat(env: *Environment, args: []const Value) !Value {
     var strings = std.ArrayList([]const u8).init(env.allocator());
+    errdefer strings.deinit();
+
     for (args) |arg| {
         if (arg == .integer) {
             const int_str = try std.fmt.allocPrint(env.allocator(), "{d}", .{ arg.integer });
@@ -197,9 +158,8 @@ pub fn concat(env: *Environment, args: []const Value) !Value {
 
 pub fn eq(env: *Environment, args: []const Value) !Value {
     _ = env;
-    if (args.len < 2) {
-        return error.NumArgs;
-    }
+    try checkArgs(args, &.{ null, null });
+
     const arg1 = args[0];
     for (args[1..]) |arg| {
         if (!eqInternal(arg1, arg)) {
@@ -271,25 +231,21 @@ pub fn list(env: *Environment, args: []const Value) !Value {
 
 pub fn quote(env: *Environment, args: []const Value) !Value {
     _ = env;
-    if (args.len != 1) {
-        return error.NumArgs;
-    }
+    try checkArgs(args, &.{ null });
+
     return args[0];
 }
 
 pub fn eval_fn(env: *Environment, args: []const Value) !Value {
-    if (args.len != 1) return error.NumArgs;
+    try checkArgs(args, &.{ null });
+
     return eval(env, args[0]);
 }
 
 pub fn lambda(env: *Environment, args: []const Value) !Value {
     _ = env;
-    if (args.len == 0) {
-        return error.NumArgs;
-    }
-    if (args[0] != .list) {
-        return error.ArgType;
-    }
+    try checkArgsVar(args, &.{ .list }, 2);
+
     for (args[0].list) |arg| {
         if (arg != .identifier) {
             return error.ArgType;
@@ -299,9 +255,8 @@ pub fn lambda(env: *Environment, args: []const Value) !Value {
 }
 
 pub fn if_fn (env: *Environment, args: []const Value) !Value {
-    if (args.len != 3) {
-        return error.NumArgs;
-    }
+    try checkArgs(args, &.{ null, null, null });
+
     const condition = args[0];
     const if_true = args[1];
     const if_false = args[2];
@@ -314,9 +269,8 @@ pub fn if_fn (env: *Environment, args: []const Value) !Value {
 
 pub fn println(env: *Environment, args: []const Value) !Value {
     _ = env;
-    if (args.len > 1) {
-        return error.NumArgs;
-    }
+    try checkArgs(args, &.{ null });
+
     const writer = std.io.getStdIn().writer();
     if (args.len == 1) {
         try args[0].toString(writer);
@@ -385,57 +339,43 @@ pub fn interface(env: *Environment, args: []const Value) !Value {
 }
 
 pub fn openbsd(env: *Environment, args: []const Value) !Value {
-    if (args.len != 1) {
-        return error.NumArgs;
-    }
-    if (args[0] != .interface) {
-        return error.ArgType;
-    }
+    try checkArgs(args, &.{ .interface });
+
     var str = std.ArrayList(u8).init(env.allocator());
     try args[0].interface.toOpenBSD(str.writer());
     return Value{ .string = try str.toOwnedSlice() };
 }
 
 pub fn conf(env: *Environment, args: []const Value) !Value {
-    if (args.len != 1) {
-        return error.NumArgs;
-    }
-    if (args[0] != .interface) {
-        return error.ArgType;
-    }
+    try checkArgs(args, &.{ .interface });
+
     var str = std.ArrayList(u8).init(env.allocator());
     try args[0].interface.toConf(str.writer());
     return Value{ .string = try str.toOwnedSlice() };
 }
 
 pub fn genPrivkey(env: *Environment, args: []const Value) !Value {
-    if (args.len != 0) {
-        return error.NumArgs;
-    }
+    try checkArgs(args, &.{});
+
     const kp = try keypair.generateKeyPair();
     return Value{ .string = try env.allocator().dupe(u8, &kp.privateBase64()) };
 }
 
 pub fn addPeer(env: *Environment, args: []const Value) !Value {
-    if (args.len != 2) {
-        return error.NumArgs;
-    }
-    if (args[0] != .interface or args[1] != .interface) {
-        return error.ArgType;
-    }
     _ = env;
+    try checkArgs(args, &.{ .interface, .interface });
+
     try (args[0].interface.addPeer(args[1].interface));
     return t;
 }
 
 pub fn trace(env: *Environment, args: []const Value) !Value {
-    if (args.len != 1) {
-        return error.NumArgs;
-    }
+    try checkArgs(args, &.{ null });
     if (args[0] == .nil) {
         env.trace = false;
         return nil;
     }
+
     env.trace = true;
     env.trace_depth += 1;
     return t;
@@ -443,24 +383,18 @@ pub fn trace(env: *Environment, args: []const Value) !Value {
 
 pub fn typeOf(env: *Environment, args: []const Value) !Value {
     _ = env;
-    if (args.len != 1) {
-        return error.ArgType;
-    }
+    try checkArgs(args, &.{ null });
 
     const ident = @tagName(args[0]);
     return Value{ .identifier = ident };
 }
 
 pub fn map(env: *Environment, args: []const Value) !Value {
-    if (args.len != 2) {
-        return error.NumArgs;
-    }
-    if (args[0] != .identifier and args[0] != .function and args[0] != .lambda) {
+    try checkArgs(args, &.{ null, .list });
+    if (!args[0].functionIsh()) {
         return error.ArgType;
     }
-    if (args[1] != .list) {
-        return error.ArgType;
-    }
+
     var output = ValueList{};
 
     for (args[1].list) |item| {
@@ -474,12 +408,8 @@ pub fn map(env: *Environment, args: []const Value) !Value {
 
 pub fn plistGet(env: *Environment, args: []const Value) !Value {
     _ = env;
-    if (args.len != 2) {
-        return error.NumArgs;
-    }
-    if (args[0] != .symbol or args[1] != .list) {
-        return error.ArgType;
-    }
+    try checkArgs(args, &.{ .symbol, .list });
+
     if (try plistValue(args[1].list, args[0].symbol)) |val| {
         return val;
     }
@@ -538,12 +468,8 @@ pub const Pair = struct {
 
 pub fn nth(env: *Environment, args: []const Value) !Value {
     _ = env;
-    if (args.len != 2) {
-        return error.NumArgs;
-    }
-    if (args[0] != .integer or args[1] != .list) {
-        return error.ArgType;
-    }
+    try checkArgs(args, &.{ .integer, .list });
+
     if (args[0].integer > args[1].list.len or args[0].integer < 0) {
         return error.OutOfRange;
     }
@@ -551,29 +477,22 @@ pub fn nth(env: *Environment, args: []const Value) !Value {
 }
 
 pub fn arenaCapacity(env: *Environment, args: []const Value) !Value {
-    _ = args;
+    try checkArgs(args, &.{});
+
     return Value{ .integer = @intCast(env.arena.queryCapacity()) };
 }
 
 pub fn first(env: *Environment, args: []const Value) !Value {
     _ = env;
-    if (args.len != 1) {
-        return error.NumArgs;
-    }
-    if (args[0] != .list) {
-        return error.ArgType;
-    }
+    try checkArgs(args, &.{ .list });
+
     return args[0].list[0];
 }
 
 pub fn rest(env: *Environment, args: []const Value) !Value {
     _ = env;
-    if (args.len != 1) {
-        return error.NumArgs;
-    }
-    if (args[0] != .list) {
-        return error.ArgType;
-    }
+    try checkArgs(args, &.{ .list });
+
     if (args[0].list.len == 0) {
         return Value{ .list = &.{} };
     }
@@ -581,12 +500,11 @@ pub fn rest(env: *Environment, args: []const Value) !Value {
 }
 
 pub fn apply(env: *Environment, args: []const Value) !Value {
-    if (args.len != 2) {
-        return error.NumArgs;
-    }
-    if (!args[0].functionIsh() or args[1] != .list) {
+    try checkArgs(args, &.{ null, .list });
+    if (!args[0].functionIsh()) {
         return error.ArgType;
     }
+
     var expr = ValueList{};
     try expr.append(env.allocator(), args[0]);
     for (args[1].list) |item| {
@@ -596,12 +514,11 @@ pub fn apply(env: *Environment, args: []const Value) !Value {
 }
 
 pub fn times(env: *Environment, args: []const Value) !Value {
-    if (args.len != 2) {
-        return error.NumArgs;
-    }
-    if (args[0] != .integer and !args[1].functionIsh()) {
+    try checkArgs(args, &.{ .integer, null });
+    if (!args[1].functionIsh()) {
         return error.ArgType;
     }
+
     for (0..@intCast(args[0].integer)) |idx| {
         const expr = [_]Value{ args[1], Value{ .integer = @intCast(idx) } };
         _ = try eval(env, Value{ .list = &expr });
@@ -611,22 +528,14 @@ pub fn times(env: *Environment, args: []const Value) !Value {
 
 pub fn length(env: *Environment, args: []const Value) !Value {
     _ = env;
-    if (args.len != 1) {
-        return error.NumArgs;
-    }
-    if (args[0] != .list) {
-        return error.ArgType;
-    }
+    try checkArgs(args, &.{ .list });
+
     return Value{ .integer = @intCast(args[0].list.len) };
 }
 
 pub fn append(env: *Environment, args: []const Value) !Value {
-    if (args.len < 2) {
-        return error.NumArgs;
-    }
-    if (args[0] != .list) {
-        return error.ArgType;
-    }
+    try checkArgsVar(args, &.{ .list }, 2);
+
     var new_list = try ValueList.initCapacity(env.allocator(), args[0].list.len + args[1..].len);
     new_list.appendSliceAssumeCapacity(args[0].list);
     new_list.appendSliceAssumeCapacity(args[1..]);
@@ -634,17 +543,14 @@ pub fn append(env: *Environment, args: []const Value) !Value {
 }
 
 pub fn memUsage(env: *Environment, args: []const Value) !Value {
-    _ = args;
+    try checkArgs(args, &.{});
+
     return Value{ .integer = @intCast(env.counting.count) };
 }
 
 pub fn loadFile(env: *Environment, args: []const Value) !Value {
-    if (args.len != 1) {
-        return error.NumArgs;
-    }
-    if (args[0] != .string) {
-        return error.ArgType;
-    }
+    try checkArgs(args, &.{ .string });
+
     const allocator = env.arena.child_allocator;
     const file_contents = try fs.cwd().readFileAlloc(allocator, args[0].string, 12 * 1024 * 1024);
     defer allocator.free(file_contents);
@@ -652,20 +558,15 @@ pub fn loadFile(env: *Environment, args: []const Value) !Value {
 }
 
 pub fn loadString(env: *Environment, args: []const Value) !Value {
-    if (args.len != 1) {
-        return error.NumArgs;
-    }
-    if (args[0] != .string) {
-        return error.ArgType;
-    }
+    try checkArgs(args, &.{ .string });
+
     return try env.load(args[0].string);
 }
 
 
 pub fn logAllocs(env: *Environment, args: []const Value) !Value {
-    if (args.len != 1) {
-        return error.NumArgs;
-    }
+    try checkArgs(args, &.{ null });
+
     if (args[0] == .nil) {
         env.counting.log = false;
         return nil;
@@ -673,3 +574,47 @@ pub fn logAllocs(env: *Environment, args: []const Value) !Value {
     env.counting.log = true;
     return t;
 }
+
+/// Same as checkArgs, except it allows more arguments than there are
+/// in `types`, and doesn't check them.
+/// Checks that there are at least `min_args` arguments.
+pub fn checkArgsVar(args: []const Value, types: []const ?ArgType, min_args: usize) !void {
+    if (args.len < min_args) {
+        return error.NumArgs;
+    }
+    try checkArgs(args[0..types.len], types);
+}
+
+/// Check that all args are one type.
+pub fn checkArgsType(args: []const Value, arg_type: ArgType) !void {
+    for (args) |arg| {
+        if (arg != arg_type) {
+            return error.ArgType;
+        }
+    }
+}
+
+/// Check the number and type of arguments.
+/// args is the arguments argument passed to the calling function
+/// types if a list of desired types.
+///
+/// For example `try checkArgs(args, &.{ .string });`
+/// means we would like to check if the function was called with a
+/// single string argument
+/// The types are optional, meaning if you don't care about the type
+/// of one of the arguments, pass `null` in that position.
+pub fn checkArgs(args: []const Value, types: []const ?ArgType) !void {
+    if (args.len != types.len) {
+        return error.NumArgs;
+    }
+    for (args, types) |arg, typ| {
+        if (typ == null) {
+            continue;
+        }
+        if (arg != typ.?) {
+            return error.ArgType;
+        }
+    }
+}
+
+pub const ArgType = @typeInfo(Value).Union.tag_type.?;
