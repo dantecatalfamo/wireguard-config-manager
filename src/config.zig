@@ -20,6 +20,8 @@ pub const Environment = struct {
         env.counting.count += @sizeOf(Environment);
         env.arena = std.heap.ArenaAllocator.init(env.counting.allocator());
         env.bindings = BindingList.init(env.counting.allocator());
+        env.trace = false;
+        env.trace_depth = 0;
 
         try env.pushBindings();
         try env.addFunc("def", cmds.def, .normal);
@@ -448,7 +450,7 @@ pub const CountingAllocator = struct {
             self.count += len;
         }
         if (self.log) {
-            std.debug.print("{d:7} - Alloc  {d}\n", .{ self.count, len });
+            std.debug.print("Heap {d:7} - Alloc  {d}\n", .{ self.count, len });
         }
         return result;
     }
@@ -462,7 +464,7 @@ pub const CountingAllocator = struct {
             self.count += new_len;
         }
         if (self.log) {
-            std.debug.print("{d:7} - Resize {d} -> {d}\n", .{  self.count, buf_len, new_len });
+            std.debug.print("Heap {d:7} - Resize {d} -> {d}\n", .{  self.count, buf_len, new_len });
         }
         return result;
     }
@@ -471,7 +473,7 @@ pub const CountingAllocator = struct {
         var self: *CountingAllocator = @ptrCast(@alignCast(ctx));
         self.count -= buf.len;
         if (self.log) {
-            std.debug.print("{d:7} - Free   {d}\n", .{ self.count, buf.len });
+            std.debug.print("Heap {d:7} - Free   {d}\n", .{ self.count, buf.len });
         }
         self.backing_allocator.rawFree(buf, buf_align, ret_addr);
     }
