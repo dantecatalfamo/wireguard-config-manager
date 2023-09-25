@@ -9,7 +9,7 @@ pub const kp = @import("keypair.zig");
 pub const KeyPair = kp.KeyPair;
 
 pub const Interface = struct {
-    id: u64,
+    id: ?u64,
     keypair: KeyPair,
     name: []const u8,
     port: ?u16 = null,

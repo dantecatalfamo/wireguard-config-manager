@@ -23,6 +23,6 @@ CREATE TABLE IF NOT EXISTS peers (
 CREATE TABLE IF NOT EXISTS allowed_ips (
   address TEXT,
   prefix INTEGER,
-  interface INTEGER,
+  peer INTEGER,
   FOREIGN KEY (peer) REFERENCES peers(id) ON DELETE CASCADE
 );
