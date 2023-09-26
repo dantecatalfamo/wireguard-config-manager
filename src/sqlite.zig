@@ -18,24 +18,60 @@ pub fn open(path: []const u8) !DB {
 pub const DB = struct {
     ptr: *c.sqlite3,
 
-    pub fn prepare(self: DB, query: []const u8) !Stmt {
+    pub fn prepare(self: DB, query: []const u8, query_tail: *[]const u8) !Stmt {
         return Stmt{
-            .ptr = try prepare_internal(self.ptr, query),
+            .ptr = try prepare_internal(self.ptr, query, query_tail),
         };
     }
 
     pub fn prepare_bind(self: DB, query: []const u8, values: anytype) !Stmt {
-        const stmt = try self.prepare(query);
+        var query_tail = query;
+        const stmt = try self.prepare(query, &query_tail);
+        if (!query_empty(query_tail)) {
+            return error.CompoundQuery;
+        }
         try stmt.bind(values);
         return stmt;
     }
 
-    pub fn exec_noret(self: DB, query: []const u8, values: anytype) !void {
-        const stmt = try self.prepare(query);
-        try stmt.bind(values);
-        while (try stmt.step() != .done) {}
-        try stmt.finalize();
+    pub fn exec_multiple(self: DB, query: []const u8) !void {
+        var query_in = query;
+        var query_tail = query;
+        while (!query_empty(query_tail)) {
+            const stmt = try self.prepare(query_in, &query_tail);
+            query_in = query_tail;
+            while (try stmt.step()) {}
+            try stmt.finalize();
+        }
     }
+
+    pub fn exec(self: DB, query: []const u8, values: anytype) !void {
+        var query_tail: []const u8 = undefined;
+        const stmt = try self.prepare_bind(query, values);
+        while (try stmt.step()) {}
+        try stmt.finalize();
+        if (!query_empty(query_tail)) {
+            return error.CompoundQuery;
+        }
+    }
+
+    pub fn exec_returning_int(self: DB, query: []const u8, values: anytype) !u64 {
+        var stmt = try self.prepare_bind(query, values);
+        _ = try stmt.step();
+        const id: u64 = @intCast(stmt.int(0));
+        try stmt.finalize();
+        return id;
+    }
+
+    fn query_empty(query: []const u8) bool {
+        for (query) |char| {
+            if (!std.ascii.isWhitespace(char)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
 
     pub fn close(self: DB) !void {
         return close_internal(self.ptr);
@@ -49,12 +85,16 @@ pub const Stmt = struct {
         try bind_internal(self.ptr, values);
     }
 
-    pub fn step(self: Stmt) !StepType {
+    pub fn step(self: Stmt) !bool {
         return step_internal(self.ptr);
     }
 
-    pub fn text(self: Stmt, column: u32) []const u8 {
-        return std.mem.span(c.sqlite3_column_text(self.ptr, @intCast(column)));
+    pub fn text(self: Stmt, column: u32) ?[]const u8 {
+        const val = c.sqlite3_column_text(self.ptr, @intCast(column));
+        if (val == null) {
+            return null;
+        }
+        return std.mem.span(val);
     }
 
     pub fn int(self: Stmt, column: u32) i64 {
@@ -84,11 +124,16 @@ pub fn open_internal(path: []const u8) !*c.sqlite3 {
     return db.?;
 }
 
-pub fn prepare_internal(db: *c.sqlite3, query: []const u8) !*c.sqlite3_stmt {
+pub fn prepare_internal(db: *c.sqlite3, query: []const u8, query_tail: *[]const u8) !*c.sqlite3_stmt {
+    var tail_ptr: [*c]u8 = undefined;
     var stmt: ?*c.sqlite3_stmt = null;
-    const ret = c.sqlite3_prepare_v2(db, query.ptr, @intCast(query.len), &stmt, null);
+    const ret = c.sqlite3_prepare_v2(db, query.ptr, @intCast(query.len), &stmt, &tail_ptr);
+    if (tail_ptr != null) {
+        const remaining_bytes: usize = @intFromPtr(tail_ptr) - @intFromPtr(query.ptr);
+        query_tail.* = query[remaining_bytes..];
+    }
     if (ret != c.SQLITE_OK) {
-        std.debug.print("{s}\n", .{ c.sqlite3_errstr(ret) });
+        std.debug.print("{s}: \"{s}\"\n", .{ c.sqlite3_errstr(ret), query });
         return error.Prepare;
     }
     return stmt.?;
@@ -123,7 +168,7 @@ pub fn bind_internal(stmt: *c.sqlite3_stmt, values: anytype) !void {
                         if (ptr.child != u8) {
                             @compileError("Unsupported pointer type " ++ @tagName(ptr.size) ++ " " ++ @tagName(@typeInfo(ptr.child)));
                         }
-                        break :blk c.sqlite3_bind_text(stmt, index, value.ptr, value.len, c.SQLITE_TRANSIENT);
+                        break :blk c.sqlite3_bind_text(stmt, index, value.ptr, @intCast(value.len), c.SQLITE_TRANSIENT);
                     },
                     else => { @compileError("Unsupported pointer size " ++ @tagName(ptr.size)); },
                 }
@@ -139,21 +184,17 @@ pub fn bind_internal(stmt: *c.sqlite3_stmt, values: anytype) !void {
     }
 }
 
-pub fn step_internal(stmt: *c.sqlite3_stmt) !StepType {
+pub fn step_internal(stmt: *c.sqlite3_stmt) !bool {
     switch (c.sqlite3_step(stmt)) {
-        c.SQLITE_ROW => return .row,
-        c.SQLITE_DONE => return .done,
+        c.SQLITE_ROW => return true,
+        c.SQLITE_DONE => return false,
+        c.SQLITE_CONSTRAINT => return error.ConstraintFailed,
         else => |i| {
-            std.debug.print("{s}\n", .{ c.sqlite3_errstr(i) });
+            std.debug.print("{d}: {s}\n", .{ i, c.sqlite3_errstr(i) });
             return error.Step;
         }
     }
 }
-
-const StepType = enum {
-    row,
-    done,
-};
 
 pub fn reset_internal(stmt: *c.sqlite3_stmt) !void {
     switch (c.sqlite3_reset(stmt)) {

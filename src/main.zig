@@ -7,18 +7,20 @@ const testing = std.testing;
 
 const keypair = @import("keypair.zig");
 const sqlite = @import("sqlite.zig");
-const schema = @embedFile("schema.sql");
+const System = @import("system.zig").System;
 
 pub fn main() !void {
-    const db = try sqlite.open(":memory:");
-    defer db.close() catch unreachable;
+    const system = try System.init("/tmp/test_wg.db", std.heap.page_allocator);
+    defer system.close() catch unreachable;
 
-    try db.exec_noret(schema, .{});
+    const if1 = try system.addInterface("potato", "192.168.10.1", 24, null);
+    const if2 = try system.addInterface("banana", "192.168.10.2", 24, null);
+    const if3 = try system.addInterface("orange", "192.168.10.3", 24, null);
+    const if4 = try system.addInterface("grape",  "192.168.10.4", 24, null);
 
-    // const stmt = try db.prepare("SELECT * FROM vv;");
-    // while (try stmt.step() != .done) {
-    //     std.debug.print("Col 1: {d}, Col 2: {s}\n", .{ stmt.int(0), stmt.text(1) });
-    // }
+    try system.addRouter(if1, if2);
+    try system.addRouter(if1, if3);
+    try system.addRouter(if1, if4);
 }
 
 test "ref all" {
