@@ -19,7 +19,7 @@ pub const System = struct {
         const db = try sqlite.open(path);
         try db.exec_multiple(schema);
         return System{
-            .db = try sqlite.open(path),
+            .db = db,
             .allocator = allocator,
         };
     }

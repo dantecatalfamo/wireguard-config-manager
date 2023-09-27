@@ -10,7 +10,7 @@ const sqlite = @import("sqlite.zig");
 const System = @import("system.zig").System;
 
 pub fn main() !void {
-    const system = try System.init("/tmp/test_wg.db", std.heap.page_allocator);
+    const system = try System.init(":memory:", std.heap.page_allocator);
     defer system.close() catch unreachable;
 
     const if1 = try system.addInterface("potato", "192.168.10.1", 24, null);
