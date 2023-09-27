@@ -32,7 +32,7 @@ pub fn generateKeyPair() !KeyPair {
 
 pub fn fromBase64PrivateKey(privkey: [44]u8) !KeyPair {
     var buffer: [32]u8 = undefined;
-    try std.base64.standard.Decoder.decode(&buffer, privkey);
+    try std.base64.standard.Decoder.decode(&buffer, &privkey);
     return try fromPrivateKey(buffer);
 }
 
