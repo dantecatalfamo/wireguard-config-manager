@@ -96,7 +96,7 @@ pub const Interface = struct {
     prefix: u6,
     preshared_key: ?[]const u8 = null,
 
-    pub fn free(self: Interface) void {
+    pub fn deinit(self: Interface) void {
         self.allocator.free(self.name);
         if (self.comment) |m| self.allocator.free(m);
         self.allocator.free(self.privkey);

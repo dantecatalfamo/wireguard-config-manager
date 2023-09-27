@@ -46,13 +46,9 @@ pub const DB = struct {
     }
 
     pub fn exec(self: DB, query: []const u8, values: anytype) !void {
-        var query_tail: []const u8 = undefined;
         const stmt = try self.prepare_bind(query, values);
         while (try stmt.step()) {}
         try stmt.finalize();
-        if (!query_empty(query_tail)) {
-            return error.CompoundQuery;
-        }
     }
 
     pub fn exec_returning_int(self: DB, query: []const u8, values: anytype) !u64 {

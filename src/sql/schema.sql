@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS peers (
   interface1 INTEGER NOT NULL,
   interface2 INTEGER NOT NULL,
   FOREIGN KEY (interface1) REFERENCES interfaces(id) ON DELETE CASCADE,
-  FOREIGN KEY (interface2) REFERENCES interfaces(id) ON DELETE CASCADE
+  FOREIGN KEY (interface2) REFERENCES interfaces(id) ON DELETE CASCADE,
   UNIQUE (interface1, interface2)
 );
 
