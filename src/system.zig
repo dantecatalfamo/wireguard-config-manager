@@ -104,7 +104,9 @@ pub const System = struct {
 
     pub fn listInterface(system: System, writer: anytype, interface_id: u64) !void {
         const details_query = "SELECT id, name, comment, privkey, hostname, address, prefix, port, psk FROM interfaces WHERE id = ?";
+        const allowed_ips_query = "SELECT address, prefix FROM allowed_ips WHERE peer = ?";
         const details_stmt = try system.db.prepare_bind(details_query, .{ interface_id });
+        const allowed_ips_stmt = try system.db.prepare(allowed_ips_query, null);
 
         if (!try details_stmt.step()) {
             return;
@@ -132,16 +134,14 @@ pub const System = struct {
         const peers_stmt = try system.db.prepare_bind(peers_query, .{ interface_id });
         while (try peers_stmt.step()) {
             try writer.print("{d: <2} | {s: <14} | ", .{ @as(u64, @intCast(peers_stmt.int(0))), peers_stmt.text(1) orelse "" });
-            const allowed_ips_query = "SELECT address, prefix FROM allowed_ips WHERE peer = ?";
-            // Should use bind/reset instead of compiling the same query
-            const allowed_ips_stmt = try system.db.prepare_bind(allowed_ips_query, .{ peers_stmt.int(2) });
+            try allowed_ips_stmt.reset();
+            try allowed_ips_stmt.bind(.{ peers_stmt.int(2) });
             while (try allowed_ips_stmt.step()) {
                 try writer.print("{s}/{d} ", .{ allowed_ips_stmt.text(0) orelse "", @as(u64, @intCast(allowed_ips_stmt.int(1))) });
             }
             try writer.print("\n", .{});
-            try allowed_ips_stmt.
-
-                finalize();    }
+        }
+        try allowed_ips_stmt.finalize();
         try peers_stmt.finalize();
     }
 };

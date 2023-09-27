@@ -18,9 +18,16 @@ pub fn open(path: []const u8) !DB {
 pub const DB = struct {
     ptr: *c.sqlite3,
 
-    pub fn prepare(self: DB, query: []const u8, query_tail: *[]const u8) !Stmt {
+    pub fn prepare(self: DB, query: []const u8, query_tail: ?*[]const u8) !Stmt {
+        var qt: []const u8 = undefined;
+        const stmt = try prepare_internal(self.ptr, query, &qt);
+        if (query_tail) |_| {
+            query_tail.?.* = qt;
+        } else if (!query_empty(qt)) {
+            return error.CompoundQuery;
+        }
         return Stmt{
-            .ptr = try prepare_internal(self.ptr, query, query_tail),
+            .ptr = stmt,
         };
     }
 

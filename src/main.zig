@@ -10,7 +10,7 @@ const sqlite = @import("sqlite.zig");
 const System = @import("system.zig").System;
 
 pub fn main() !void {
-    const system = try System.init(":memory:", std.heap.page_allocator);
+    const system = try System.init("/tmp/wgbank_test.db", std.heap.page_allocator);
     defer system.close() catch unreachable;
 
     const stdout = std.io.getStdOut().writer();
