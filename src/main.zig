@@ -39,6 +39,8 @@ pub fn main() !void {
         try system.addRouter(if1, if2);
         try system.addRouter(if1, if3);
         try system.addRouter(if1, if4);
+
+        try system.addPeer(if2, if3);
     }
 }
 

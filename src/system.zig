@@ -66,14 +66,26 @@ pub const System = struct {
 
     pub fn addRouter(self: System, router_id: u64, client_id: u64) !void {
         const router = try self.getInterface(router_id);
+        defer router.deinit();
         const client = try self.getInterface(client_id);
-        const router_to_client = try self.addPeer(router_id, client_id);
-        const client_to_router = try self.addPeer(client_id, router_id);
+        defer client.deinit();
+        const router_to_client = try self.addPeerEntry(router_id, client_id);
+        const client_to_router = try self.addPeerEntry(client_id, router_id);
         _ = try self.addAllowedIP(router_to_client, client.address, 32);
         _ = try self.addAllowedIP(client_to_router, router.address, router.prefix);
     }
 
-    pub fn addPeer(self: System, interface_id1: u64, interface_id2: u64) !u64 {
+    pub fn addPeer(self: System, interface1_id: u64, interface2_id: u64) !void {
+        const query = "SELECT address FROM interfaces WHERE id = ?";
+        const peer1_id = try self.addPeerEntry(interface1_id, interface2_id);
+        const interface1_address = try self.db.exec_returning_text(self.allocator, query, .{ interface1_id });
+        const peer2_id = try self.addPeerEntry(interface2_id, interface1_id);
+        const interface2_address = try self.db.exec_returning_text(self.allocator, query, .{ interface2_id });
+        _ = try self.addAllowedIP(peer1_id, interface2_address, 32);
+        _ = try self.addAllowedIP(peer2_id, interface1_address, 32);
+    }
+
+    pub fn addPeerEntry(self: System, interface_id1: u64, interface_id2: u64) !u64 {
         const query = "INSERT INTO peers (interface1, interface2) VALUES (?, ?) RETURNING id";
         return try self.db.exec_returning_int(query, .{ interface_id1, interface_id2 });
     }

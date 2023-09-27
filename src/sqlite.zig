@@ -60,10 +60,23 @@ pub const DB = struct {
 
     pub fn exec_returning_int(self: DB, query: []const u8, values: anytype) !u64 {
         var stmt = try self.prepare_bind(query, values);
-        _ = try stmt.step();
+        if (!try stmt.step()) {
+            return error.NoRecord;
+        }
         const id: u64 = @intCast(stmt.int(0));
         try stmt.finalize();
         return id;
+    }
+
+    pub fn exec_returning_text(self: DB, allocator: mem.Allocator, query: []const u8, values: anytype) ![]const u8 {
+        var stmt = try self.prepare_bind(query, values);
+        if (!try stmt.step()) {
+            return error.NoRecord;
+        }
+        const stmt_text = stmt.text(0) orelse return error.NullEntry;
+        const text = try allocator.dupe(u8, stmt_text);
+        try stmt.finalize();
+        return text;
     }
 
     fn query_empty(query: []const u8) bool {
