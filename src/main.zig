@@ -55,6 +55,16 @@ pub fn main() !void {
             break :blk try std.fmt.parseInt(u64, arg, 10);
         };
         try system.addPeer(if1, if2);
+    } else if (mem.eql(u8, operation, "route")) {
+        const if1 = blk: {
+            const arg = arg_iter.next() orelse return error.MissingArg;
+            break :blk try std.fmt.parseInt(u64, arg, 10);
+        };
+        const if2 = blk: {
+            const arg = arg_iter.next() orelse return error.MissingArg;
+            break :blk try std.fmt.parseInt(u64, arg, 10);
+        };
+        try system.addRouter(if2, if1);
     } else if (mem.eql(u8, operation, "seed")) {
         const if1 = try system.addInterface("potato", "192.168.10.1", 24, null);
         const if2 = try system.addInterface("banana", "192.168.10.2", 24, null);
