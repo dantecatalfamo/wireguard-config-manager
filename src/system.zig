@@ -33,7 +33,6 @@ pub const System = struct {
         try self.db.close();
     }
 
-    // TODO Take Interface as thing
     pub fn addInterface(self: System, name: []const u8, address: []const u8, prefix: u6, privkey: ?[32]u8) !u64 {
         const query = "INSERT INTO interfaces (name, address, prefix, privkey) VALUES (?, ?, ?, ?) RETURNING id";
         const kp = if (privkey) |pk|
@@ -52,7 +51,7 @@ pub const System = struct {
         _ = try stmt.step();
         return  Interface{
             .allocator = self.allocator,
-            .id = @intCast(stmt.int(0)),
+            .id = stmt.uint(0),
             .name = if (stmt.text(1)) |str| try self.allocator.dupe(u8, str) else return error.InvalidInterfaceName,
             .comment = if (stmt.text(2)) |str| try self.allocator.dupe(u8, str) else null,
             .privkey = if (stmt.text(3)) |str| try self.allocator.dupe(u8, str) else return error.InvalidInterfacePrivkey,
@@ -79,8 +78,10 @@ pub const System = struct {
         const query = "SELECT address FROM interfaces WHERE id = ?";
         const peer1_id = try self.addPeerEntry(interface1_id, interface2_id);
         const interface1_address = try self.db.exec_returning_text(self.allocator, query, .{ interface1_id });
+        defer self.allocator.free(interface1_address);
         const peer2_id = try self.addPeerEntry(interface2_id, interface1_id);
         const interface2_address = try self.db.exec_returning_text(self.allocator, query, .{ interface2_id });
+        defer self.allocator.free(interface2_address);
         _ = try self.addAllowedIP(peer1_id, interface2_address, 32);
         _ = try self.addAllowedIP(peer2_id, interface1_address, 32);
     }
@@ -98,17 +99,17 @@ pub const System = struct {
     pub fn listInterfaces(system: System, writer: anytype) !void {
         const query = "SELECT i.id, i.name, i.address, i.prefix, i.privkey, count(p.id), i.comment FROM interfaces i LEFT JOIN peers p ON i.id = p.interface1 GROUP BY i.id";
         const stmt = try system.db.prepare_bind(query, .{});
-        try writer.print("ID |      Name      |     Address     |                  Public Key                  | Peers | Comment \n", .{});
-        try writer.print("---+----------------+-----------------+----------------------------------------------+-------+---------\n", .{});
+        try writer.print("ID |      Name      |       Address      |                  Public Key                  | Peers | Comment \n", .{});
+        try writer.print("---+----------------+--------------------+----------------------------------------------+-------+---------\n", .{});
         while (try stmt.step()) {
             try writer.print(
-                "{d: <2} | {?s: <14} | {?s}/{d} | {s} | {d: <5} | {s}\n", .{
-                    @as(u64, @intCast(stmt.int(0))),
+                "{d: <2} | {?s: <14} | {?s: <15}/{d: <2} | {s} | {d: <5} | {s}\n", .{
+                    stmt.uint(0),
                     stmt.text(1),
                     stmt.text(2),
-                    stmt.int(3),
+                    stmt.uint(3),
                     try keypair.base64PrivateToPublic(stmt.text(4) orelse ""),
-                    @as(u64, @intCast(stmt.int(5))),
+                    stmt.uint(5),
 
                     stmt.text(6) orelse "",        });
         }
@@ -128,14 +129,14 @@ pub const System = struct {
 
         try writer.print("Interface details\n", .{});
         try writer.print("-----------------\n", .{});
-        try writer.print("ID: {d}\n", .{ @as(u64, @intCast(details_stmt.int(0))) });
+        try writer.print("ID: {d}\n", .{ details_stmt.uint(0) });
         try writer.print("Name: {s}\n", .{ details_stmt.text(1) orelse "" });
         try writer.print("Comment: {s}\n", .{ details_stmt.text(2) orelse "" });
         try writer.print("PubKey: {s}\n", .{ try keypair.base64PrivateToPublic(details_stmt.text(3) orelse "") });
         try writer.print("PrivKey: {s}\n", .{ details_stmt.text(3) orelse "" });
         try writer.print("Hostname: {s}\n", .{ details_stmt.text(4) orelse "" });
-        try writer.print("Address: {s}/{d}\n", .{ details_stmt.text(5) orelse "", @as(u64, @intCast(details_stmt.int(6))) });
-        try writer.print("Port: {d}\n", .{ @as(u64, @intCast(details_stmt.int(7))) });
+        try writer.print("Address: {s}/{d}\n", .{ details_stmt.text(5) orelse "", details_stmt.uint(6) });
+        try writer.print("Port: {d}\n", .{ details_stmt.uint(7) });
         try writer.print("PSK: {s}\n", .{ details_stmt.text(8) orelse "" });
 
         try writer.print("\nPeers\n", .{});
@@ -143,11 +144,11 @@ pub const System = struct {
         try writer.print("ID |      Name      |   Allowed IPs    \n", .{});
         try writer.print("---+----------------+------------------\n", .{});
         while (try peers_stmt.step()) {
-            try writer.print("{d: <2} | {s: <14} | ", .{ @as(u64, @intCast(peers_stmt.int(0))), peers_stmt.text(1) orelse "" });
+            try writer.print("{d: <2} | {s: <14} | ", .{ peers_stmt.uint(0), peers_stmt.text(1) orelse "" });
             try allowed_ips_stmt.reset();
             try allowed_ips_stmt.bind(.{ peers_stmt.int(2) });
             while (try allowed_ips_stmt.step()) {
-                try writer.print("{s}/{d} ", .{ allowed_ips_stmt.text(0) orelse "", @as(u64, @intCast(allowed_ips_stmt.int(1))) });
+                try writer.print("{s}/{d} ", .{ allowed_ips_stmt.text(0) orelse "", allowed_ips_stmt.int(1) });
             }
             try writer.print("\n", .{});
         }

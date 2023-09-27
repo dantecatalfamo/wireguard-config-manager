@@ -117,6 +117,10 @@ pub const Stmt = struct {
         return @intCast(c.sqlite3_column_int64(self.ptr, @intCast(column)));
     }
 
+    pub fn uint(self: Stmt, column: u32) u64 {
+        return @intCast(c.sqlite3_column_int64(self.ptr, @intCast(column)));
+    }
+
     pub fn count(self: Stmt) u32 {
         return @intCast(c.sqlite3_column_count(self.ptr));
     }
