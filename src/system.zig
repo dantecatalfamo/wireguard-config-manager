@@ -45,6 +45,11 @@ pub const System = struct {
         return try self.db.exec_returning_int(query, .{ name, address, prefix, &pk });
     }
 
+    pub fn removeInterface(self: System, interface_id: u64) !void {
+        const query = "DELETE FROM interfaces WHERE id = ?";
+        try self.db.exec(query, .{ interface_id });
+    }
+
     pub fn getInterface(self: System, id: u64) !Interface {
         const query = "SELECT id, name, comment, privkey, hostname, port, address, prefix, psk FROM interfaces WHERE id = ?";
         const stmt = try self.db.prepare_bind(query, .{ id });
@@ -84,6 +89,12 @@ pub const System = struct {
         defer self.allocator.free(interface2_address);
         _ = try self.addAllowedIP(peer1_id, interface2_address, 32);
         _ = try self.addAllowedIP(peer2_id, interface1_address, 32);
+    }
+
+    pub fn unPeer(self: System, interface1_id: u64, interface2_id: u64) !void {
+        const query = "DELETE FROM peers WHERE interface1 = ? AND interface2 = ?";
+        try self.db.exec(query, .{ interface1_id, interface2_id });
+        try self.db.exec(query, .{ interface2_id, interface1_id });
     }
 
     pub fn addPeerEntry(self: System, interface_id1: u64, interface_id2: u64) !u64 {

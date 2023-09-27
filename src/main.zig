@@ -38,33 +38,29 @@ pub fn main() !void {
         }
     } else if (mem.eql(u8, operation, "add")) {
         const name = arg_iter.next() orelse return error.MissingArg;
-        const address = arg_iter.next() orelse return error.MissingArg;
-        const prefix = blk: {
-            const arg = arg_iter.next() orelse return error.MissingArg;
-            break :blk try std.fmt.parseInt(u6, arg, 10);
-        };
-        const id = try system.addInterface(name, address, prefix, null);
+        const addr_pfx = try parseAddrPrefix(arg_iter.next() orelse return error.MissingArg);
+        const id = try system.addInterface(name, addr_pfx.address, addr_pfx.prefix, null);
         try stdout.print("{d}\n", .{ id });
     } else if (mem.eql(u8, operation, "peer")) {
-        const if1 = blk: {
-            const arg = arg_iter.next() orelse return error.MissingArg;
-            break :blk try std.fmt.parseInt(u64, arg, 10);
-        };
-        const if2 = blk: {
-            const arg = arg_iter.next() orelse return error.MissingArg;
-            break :blk try std.fmt.parseInt(u64, arg, 10);
-        };
+        const if1 = try argInt(&arg_iter);
+        const if2 = try argInt(&arg_iter);
         try system.addPeer(if1, if2);
     } else if (mem.eql(u8, operation, "route")) {
-        const if1 = blk: {
-            const arg = arg_iter.next() orelse return error.MissingArg;
-            break :blk try std.fmt.parseInt(u64, arg, 10);
-        };
-        const if2 = blk: {
-            const arg = arg_iter.next() orelse return error.MissingArg;
-            break :blk try std.fmt.parseInt(u64, arg, 10);
-        };
+        const if1 = try argInt(&arg_iter);
+        const if2 = try argInt(&arg_iter);
         try system.addRouter(if2, if1);
+    } else if (mem.eql(u8, operation, "allow")) {
+        const if1 = try argInt(&arg_iter);
+        const if2 = try argInt(&arg_iter);
+        _ = if1;
+        _ = if2;
+    } else if (mem.eql(u8, operation, "unpeer")) {
+        const if1 = try argInt(&arg_iter);
+        const if2 = try argInt(&arg_iter);
+        try system.unPeer(if1, if2);
+    } else if (mem.eql(u8, operation, "remove")) {
+        const id = try argInt(&arg_iter);
+        try system.removeInterface(id);
     } else if (mem.eql(u8, operation, "seed")) {
         const if1 = try system.addInterface("potato", "192.168.10.1", 24, null);
         const if2 = try system.addInterface("banana", "192.168.10.2", 24, null);
@@ -78,6 +74,27 @@ pub fn main() !void {
         try system.addPeer(if2, if3);
     }
 }
+
+pub fn argInt(iter: *std.process.ArgIterator) !u64 {
+    const arg = iter.next() orelse return error.MissingArg;
+    return try std.fmt.parseInt(u64, arg, 10);
+}
+
+pub fn parseAddrPrefix(str: []const u8) !AddrPrefix {
+    var iter = mem.split(u8, str, "/");
+    const addr = iter.first();
+    const prefix_str = iter.next() orelse "32";
+    const prefix = try std.fmt.parseInt(u6, prefix_str, 10);
+    return .{
+        .address = addr,
+        .prefix = prefix
+    };
+}
+
+pub const AddrPrefix = struct {
+    address: []const u8,
+    prefix: u6,
+};
 
 test "ref all" {
     testing.refAllDeclsRecursive(@This());
