@@ -44,16 +44,13 @@ pub fn listInterfaces(system: System) !void {
     std.debug.print("ID |      Name      |     Address     |                  Public Key                  | Peers | Comment \n", .{});
     std.debug.print("---+----------------+-----------------+----------------------------------------------+-------+---------\n", .{});
     while (try stmt.step()) {
-        var privkey: [44]u8 = undefined;
-        @memcpy(&privkey, stmt.text(4).?);
-        const kp = try keypair.fromBase64PrivateKey(privkey);
         std.debug.print(
             "{d: <2} | {?s: <14} | {?s}/{d} | {s} | {d: <5} | {s}\n", .{
                 @as(u64, @intCast(stmt.int(0))),
                 stmt.text(1),
                 stmt.text(2),
                 stmt.int(3),
-                &kp.publicBase64(),
+                try keypair.base64PrivateToPublic(stmt.text(4) orelse ""),
                 @as(u64, @intCast(stmt.int(5))),
                 stmt.text(6) orelse "",
         });
@@ -64,17 +61,14 @@ pub fn listInterface(system: System, interface_id: u64) !void {
     const details_query = "SELECT id, name, comment, privkey, hostname, address, prefix, port, prefix, psk FROM interfaces WHERE id = ?";
     const details_stmt = try system.db.prepare_bind(details_query, .{ interface_id });
     _ = try details_stmt.step();
-    var privkey: [44]u8 = undefined;
-    @memcpy(&privkey, details_stmt.text(3) orelse "");
-    const kp = try keypair.fromBase64PrivateKey(privkey);
 
     std.debug.print("Interface details\n", .{});
     std.debug.print("-----------------\n", .{});
     std.debug.print("ID: {d}\n", .{ @as(u64, @intCast(details_stmt.int(0))) });
     std.debug.print("Name: {s}\n", .{ details_stmt.text(1) orelse "" });
     std.debug.print("Comment: {s}\n", .{ details_stmt.text(2) orelse "" });
-    std.debug.print("PubKey: {s}\n", .{ &kp.publicBase64() });
-    std.debug.print("PrivKey: {s}\n", .{ &kp.privateBase64() });
+    std.debug.print("PubKey: {s}\n", .{ try keypair.base64PrivateToPublic(details_stmt.text(3) orelse "") });
+    std.debug.print("PrivKey: {s}\n", .{ details_stmt.text(3) orelse "" });
     std.debug.print("Hostname: {s}\n", .{ details_stmt.text(4) orelse "" });
     std.debug.print("Address: {s}/{d}\n", .{ details_stmt.text(5) orelse "", @as(u64, @intCast(details_stmt.int(6))) });
     std.debug.print("Port: {d}\n", .{ @as(u64, @intCast(details_stmt.int(7))) });

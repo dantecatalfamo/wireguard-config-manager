@@ -30,9 +30,16 @@ pub fn generateKeyPair() !KeyPair {
     };
 }
 
-pub fn fromBase64PrivateKey(privkey: [44]u8) !KeyPair {
+pub fn base64PrivateToPublic(privkey: []const u8) ![44]u8 {
+    const kp = try fromBase64PrivateKey(privkey);
+    return kp.publicBase64();
+}
+
+pub fn fromBase64PrivateKey(privkey: []const u8) !KeyPair {
+    var base64_buffer: [44]u8 = undefined;
     var buffer: [32]u8 = undefined;
-    try std.base64.standard.Decoder.decode(&buffer, &privkey);
+    @memcpy(&base64_buffer, privkey);
+    try std.base64.standard.Decoder.decode(&buffer, &base64_buffer);
     return try fromPrivateKey(buffer);
 }
 
