@@ -26,5 +26,6 @@ CREATE TABLE IF NOT EXISTS allowed_ips (
     peer INTEGER,
     address TEXT,
     prefix INTEGER,
-    FOREIGN KEY (peer) REFERENCES peers (id) ON DELETE CASCADE
+    FOREIGN KEY (peer) REFERENCES peers (id) ON DELETE CASCADE,
+    UNIQUE (peer, address, prefix)
 );

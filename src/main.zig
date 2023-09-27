@@ -52,8 +52,13 @@ pub fn main() !void {
     } else if (mem.eql(u8, operation, "allow")) {
         const if1 = try argInt(&arg_iter);
         const if2 = try argInt(&arg_iter);
-        _ = if1;
-        _ = if2;
+        const addr_pdx = try parseAddrPrefix(arg_iter.next() orelse return error.MissingArg);
+        try system.addAllowedIP(if1, if2, addr_pdx.address, addr_pdx.prefix);
+    } else if (mem.eql(u8, operation, "unallow")) {
+        const if1 = try argInt(&arg_iter);
+        const if2 = try argInt(&arg_iter);
+        const addr_pdx = try parseAddrPrefix(arg_iter.next() orelse return error.MissingArg);
+        try system.removeAllowedIP(if1, if2, addr_pdx.address, addr_pdx.prefix);
     } else if (mem.eql(u8, operation, "unpeer")) {
         const if1 = try argInt(&arg_iter);
         const if2 = try argInt(&arg_iter);

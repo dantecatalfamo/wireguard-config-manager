@@ -75,8 +75,8 @@ pub const System = struct {
         defer client.deinit();
         const router_to_client = try self.addPeerEntry(router_id, client_id);
         const client_to_router = try self.addPeerEntry(client_id, router_id);
-        _ = try self.addAllowedIP(router_to_client, client.address, 32);
-        _ = try self.addAllowedIP(client_to_router, router.address, router.prefix);
+        _ = try self.addAllowedIPEntry(router_to_client, client.address, 32);
+        _ = try self.addAllowedIPEntry(client_to_router, router.address, router.prefix);
     }
 
     pub fn addPeer(self: System, interface1_id: u64, interface2_id: u64) !void {
@@ -87,8 +87,8 @@ pub const System = struct {
         const peer2_id = try self.addPeerEntry(interface2_id, interface1_id);
         const interface2_address = try self.db.exec_returning_text(self.allocator, query, .{ interface2_id });
         defer self.allocator.free(interface2_address);
-        _ = try self.addAllowedIP(peer1_id, interface2_address, 32);
-        _ = try self.addAllowedIP(peer2_id, interface1_address, 32);
+        _ = try self.addAllowedIPEntry(peer1_id, interface2_address, 32);
+        _ = try self.addAllowedIPEntry(peer2_id, interface1_address, 32);
     }
 
     pub fn unPeer(self: System, interface1_id: u64, interface2_id: u64) !void {
@@ -102,9 +102,23 @@ pub const System = struct {
         return try self.db.exec_returning_int(query, .{ interface_id1, interface_id2 });
     }
 
-    pub fn addAllowedIP(self: System, peer: u64, address: []const u8, prefix: u6) !u64 {
+    pub fn addAllowedIP(self: System, interface1_id: u64, interface2_id: u64, address: []const u8, prefix: u6) !void {
+        const peer_query = "SELECT id FROM peers WHERE interface1 = ? AND interface2 = ?";
+        const allowed_ip_query = "INSERT INTO allowed_ips (peer, address, prefix) VALUES (?, ?, ?)";
+        const peer_id = try self.db.exec_returning_int(peer_query, .{ interface1_id, interface2_id });
+        try self.db.exec(allowed_ip_query, .{ peer_id, address, prefix });
+    }
+
+    pub fn addAllowedIPEntry(self: System, peer: u64, address: []const u8, prefix: u6) !u64 {
         const query = "INSERT INTO allowed_ips (peer, address, prefix) VALUES (?, ?, ?) RETURNING id";
         return try self.db.exec_returning_int(query, .{ peer, address, prefix });
+    }
+
+    pub fn removeAllowedIP(self: System, interface1_id: u64, interface2_id: u64, address: []const u8, prefix: u6) !void {
+        const peer_query = "SELECT id FROM peers WHERE interface1 = ? AND interface2 = ?";
+        const allowed_ip_query = "DELETE FROM allowed_ips WHERE peer = ? AND address = ? AND prefix = ?";
+        const peer_id = try self.db.exec_returning_int(peer_query, .{ interface1_id, interface2_id });
+        try self.db.exec(allowed_ip_query, .{ peer_id, address, prefix });
     }
 
     pub fn listInterfaces(system: System, writer: anytype) !void {
