@@ -104,8 +104,10 @@ pub const System = struct {
 
     pub fn listInterface(system: System, writer: anytype, interface_id: u64) !void {
         const details_query = "SELECT id, name, comment, privkey, hostname, address, prefix, port, psk FROM interfaces WHERE id = ?";
+        const peers_query = "SELECT i.id, i.name, p.id FROM peers AS p JOIN interfaces AS i ON p.interface2 = i.id WHERE p.interface1 = ?";
         const allowed_ips_query = "SELECT address, prefix FROM allowed_ips WHERE peer = ?";
         const details_stmt = try system.db.prepare_bind(details_query, .{ interface_id });
+        const peers_stmt = try system.db.prepare_bind(peers_query, .{ interface_id });
         const allowed_ips_stmt = try system.db.prepare(allowed_ips_query, null);
 
         if (!try details_stmt.step()) {
@@ -124,14 +126,10 @@ pub const System = struct {
         try writer.print("Port: {d}\n", .{ @as(u64, @intCast(details_stmt.int(7))) });
         try writer.print("PSK: {s}\n", .{ details_stmt.text(8) orelse "" });
 
-        try details_stmt.finalize();
-
         try writer.print("\nPeers\n", .{});
         try writer.print("-----\n", .{});
         try writer.print("ID |      Name      |   Allowed IPs    \n", .{});
         try writer.print("---+----------------+------------------\n", .{});
-        const peers_query = "SELECT i.id, i.name, p.id FROM peers AS p JOIN interfaces AS i ON p.interface2 = i.id WHERE p.interface1 = ?";
-        const peers_stmt = try system.db.prepare_bind(peers_query, .{ interface_id });
         while (try peers_stmt.step()) {
             try writer.print("{d: <2} | {s: <14} | ", .{ @as(u64, @intCast(peers_stmt.int(0))), peers_stmt.text(1) orelse "" });
             try allowed_ips_stmt.reset();
@@ -141,8 +139,9 @@ pub const System = struct {
             }
             try writer.print("\n", .{});
         }
-        try allowed_ips_stmt.finalize();
+        try details_stmt.finalize();
         try peers_stmt.finalize();
+        try allowed_ips_stmt.finalize();
     }
 };
 
