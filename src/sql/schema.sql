@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS interfaces (
     hostname TEXT,
     port INTEGER,
     address TEXT NOT NULL UNIQUE,
-    prefix INTEGER
+    prefix INTEGER,
+    dns TEXT
 );
 
 CREATE TABLE IF NOT EXISTS peers (
