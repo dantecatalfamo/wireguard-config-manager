@@ -96,13 +96,13 @@ pub fn usage() noreturn {
             \\usage: wgbank <option> [args]
             \\options:
             \\  list                                 List all interfaces
-            \\  list  <if>                           Display detailed view of an interface
-            \\  add   <name> <ip[/prefix]>           Add a new interface with name and IP/subnet
-            \\  peer  <if1> <if2>                    Peer two interfaces
-            \\  route <if> <router_if>               Peer two interfaces, where <if> accepts the entire subnet through <router_if>
+            \\  list <if>                            Display detailed view of an interface
+            \\  add  <name> <ip[/prefix]>            Add a new interface with name and IP/subnet
+            \\  peer    <if1> <if2>                  Peer two interfaces
+            \\  unpeer  <if1> <if2>                  Remove the connection between two interfaces
+            \\  route   <if> <router_if>             Peer two interfaces, where <if> accepts the entire subnet through <router_if>
             \\  allow   <if> <peer_if> <ip[/prefix]> Allow an IP or subnet into <if> from <peer_if>
             \\  unallow <if> <peer_if> <ip[/prefix]> Unallow an IP or subnet into <if> from <peer_if>
-            \\  unpeer <if1> <if2>                   Remove the connection between two interfaces
             \\  remove <if>                          Remove an interface
             \\  config <if>                          Export the configuration an interface in wg-quick format
             \\  genpsk   <if1> <if2>                 Generate a preshared key between two interfaces
