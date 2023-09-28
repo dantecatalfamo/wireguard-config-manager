@@ -46,14 +46,13 @@ pub fn main() !void {
         .add => {
             const name = arg_iter.next() orelse return error.MissingArg;
             const addr_pfx = try System.parseAddrPrefix(arg_iter.next() orelse return error.MissingArg);
-            const id = system.addInterface(name, addr_pfx.address, addr_pfx.prefix, null) catch |err| switch (err) {
+            _ = system.addInterface(name, addr_pfx.address, addr_pfx.prefix, null) catch |err| switch (err) {
                 error.ConstraintFailed => {
                     try stderr.print("New interface conflicts with existing interface\n", .{});
                     os.exit(1);
                 },
                 else => return err,
             };
-            try stdout.print("{d}\n", .{ id });
         },
         .peer => {
             const if1 = try interfaceId(system, &arg_iter);
