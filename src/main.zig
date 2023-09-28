@@ -248,6 +248,22 @@ pub fn interfaceId(system: System, iter: *std.process.ArgIterator) !u64 {
 pub fn setupDbPath(allocator: mem.Allocator) ![:0]const u8 {
     var env = try std.process.getEnvMap(allocator);
     defer env.deinit();
+    const custom_db_path = env.get("WGCM_DB_PATH");
+    if (custom_db_path) |custom_path| {
+        const dir_name = fs.path.dirname(custom_path) orelse {
+            std.debug.print("Invalid custom DB path (WGMC_DB_PATH)\n", .{});
+            os.exit(1);
+        };
+        if (!fs.path.isAbsolute(dir_name)) {
+            std.debug.print("Invalid custom DB path (WGMC_DB_PATH): Path must be absolute\n", .{});
+            os.exit(1);
+        }
+        fs.cwd().access(dir_name, .{}) catch {
+            std.debug.print("Invalid custom DB path (WGMC_DB_PATH): Directory does not exist\n", .{});
+            os.exit(1);
+        };
+        return try allocator.dupeZ(u8, custom_path);
+    }
     const xdg_config = env.get("XDG_CONFIG_HOME");
     if (xdg_config) |config_path| {
         const dir_path = try fs.path.join(allocator, &.{ config_path, config_dir_name });

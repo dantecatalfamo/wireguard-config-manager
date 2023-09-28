@@ -30,10 +30,6 @@ fields:
   dns
 ```
 
-## Config location
-
-The database is located at `~/.config/wireguard-config-manager/wgcm.db`
-
 ## Dependecies
 - `sqlite3`
 
@@ -41,3 +37,9 @@ The database is located at `~/.config/wireguard-config-manager/wgcm.db`
 
 Using the latest master build of zig
 - `zig build -Doptimize=ReleaseSafe`
+
+## Database location
+
+The default database is located at `~/.config/wireguard-config-manager/wgcm.db`
+
+You can customize the location of the database using the `WGCM_DB_PATH` environment variable.
