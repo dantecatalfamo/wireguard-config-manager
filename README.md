@@ -30,7 +30,8 @@ fields:
   dns
 ```
 
-## Dependecies
+## Dependencies
+
 - `sqlite3`
 
 ## Building
