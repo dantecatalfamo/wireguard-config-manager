@@ -73,7 +73,7 @@ pub fn main() !void {
             const id = try interfaceId(system, &arg_iter);
             try system.removeInterface(id);
         },
-        .config => {
+        .@"export" => {
             const id = try interfaceId(system, &arg_iter);
             try system.exportConf(id, stdout);
         },
@@ -107,6 +107,10 @@ pub fn main() !void {
                 return error.InvalidFieldName;
             }
         },
+        .dump => {
+            const dir = arg_iter.next() orelse usage();
+            try system.dump(dir);
+        },
         .seed => {
             const if1 = try system.addInterface("potato", "192.168.10.1", 24, null);
             const if2 = try system.addInterface("banana", "192.168.10.2", 24, null);
@@ -132,11 +136,12 @@ pub const Command = enum {
     allow,
     unallow,
     remove,
-    config,
+    @"export",
     genpsk,
     clearpsk,
     setpsk,
     set,
+    dump,
     seed,
 };
 
@@ -157,6 +162,7 @@ pub fn usage() noreturn {
             \\  genpsk   <name1> <name2>                  Generate a preshared key between two interfaces
             \\  clearpsk <name1> <name2>                  Remove the preshared key between two interfaces
             \\  set      <name> <field> <value>           Set a value for a field on an interface
+            \\  dump     <directory>                      Export all configuration files to a directory
             \\fields:
             \\  name
             \\  comment

@@ -299,6 +299,23 @@ pub const System = struct {
         try allowed_ips_stmt.finalize();
     }
 
+    pub fn dump(self: System, dir: []const u8) !void {
+        const query = "SELECT id, name FROM interfaces";
+        try fs.cwd().makePath(dir);
+        const stmt = try self.db.prepare(query, null);
+        while (try stmt.step()) {
+            const id = stmt.uint(0);
+            const name = stmt.text(1).?;
+            const conf_name = try std.fmt.allocPrint(self.allocator, "{s}.conf", .{ name });
+            defer self.allocator.free(conf_name);
+            const path = try fs.path.join(self.allocator, &.{ dir, conf_name });
+            defer self.allocator.free(path);
+            const file = try fs.cwd().createFile(path, .{});
+            defer file.close();
+            try self.exportConf(id, file.writer());
+        }
+    }
+
     pub fn parseAddrPrefix(str: []const u8) !AddrPrefix {
         var iter = mem.split(u8, str, "/");
         const addr = iter.first();
