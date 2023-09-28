@@ -36,3 +36,8 @@ The database is located at `~/.config/wireguard-config-manager/wgcm.db`
 
 ## Dependecies
 - `sqlite3`
+
+## Building
+
+Using the latest master build of zig
+- `zig build -Doptimize=ReleaseSafe`
