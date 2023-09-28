@@ -229,8 +229,14 @@ pub const System = struct {
             try writer.print("{s: <14} | {s: <44} | ", .{ peers_stmt.text(1) orelse "", peers_stmt.text(2) orelse "" });
             try allowed_ips_stmt.reset();
             try allowed_ips_stmt.bind(.{ peers_stmt.int(3) });
+            var first = true;
             while (try allowed_ips_stmt.step()) {
-                try writer.print("{s}/{d} ", .{ allowed_ips_stmt.text(0) orelse "", allowed_ips_stmt.int(1) });
+                if (first) {
+                    first = false;
+                } else {
+                    try writer.print(", ", .{});
+                }
+                try writer.print("{s}/{d}", .{ allowed_ips_stmt.text(0).?, allowed_ips_stmt.uint(1) });
             }
             try writer.print("\n", .{});
         }
