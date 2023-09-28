@@ -28,3 +28,7 @@ fields:
   port
   dns
 ```
+
+## Config location
+
+The database is located at `~/.config/wireguard-config-manager/wgcm.db`
