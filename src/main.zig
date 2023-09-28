@@ -158,7 +158,7 @@ pub fn usage() noreturn {
             \\  allow    <name> <peer_name> <ip[/prefix]> Allow an IP or subnet into <name> from <peer_name>
             \\  unallow  <name> <peer_name> <ip[/prefix]> Unallow an IP or subnet into <name> from <peer_name>
             \\  remove   <name>                           Remove an interface
-            \\  config   <name>                           Export the configuration an interface in wg-quick format
+            \\  export   <name>                           Export the configuration for an interface in wg-quick format to stdout
             \\  genpsk   <name1> <name2>                  Generate a preshared key between two interfaces
             \\  clearpsk <name1> <name2>                  Remove the preshared key between two interfaces
             \\  set      <name> <field> <value>           Set a value for a field on an interface
