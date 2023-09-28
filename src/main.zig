@@ -18,23 +18,21 @@ pub fn main() !void {
 
     const stdout = std.io.getStdOut().writer();
     const stderr = std.io.getStdErr().writer();
+    _ = stderr;
 
     var arg_iter = try std.process.argsWithAllocator(allocator);
     defer arg_iter.deinit();
 
     _ = arg_iter.skip();
 
-    const operation = arg_iter.next() orelse {
-        try stderr.print("No argumets provided\n", .{});
-        return;
-    };
+    const operation = arg_iter.next() orelse usage();
 
     if (mem.eql(u8, operation, "list")) {
-        if (std.os.argv.len == 2) {
-            try system.listInterfaces(stdout);
-        } else {
-            const interface_id = try std.fmt.parseInt(u8, mem.span(std.os.argv[2]), 10);
+        if (arg_iter.next()) |id| {
+            const interface_id = try std.fmt.parseInt(u8, id, 10);
             try system.listInterface(stdout, interface_id);
+        } else {
+            try system.listInterfaces(stdout);
         }
     } else if (mem.eql(u8, operation, "add")) {
         const name = arg_iter.next() orelse return error.MissingArg;
@@ -91,6 +89,27 @@ pub fn main() !void {
         try system.setPresharedKey(if1, if2, "DEADBEEF");
         try system.addPeer(if2, if3);
     }
+}
+
+pub fn usage() noreturn {
+    std.io.getStdErr().writer().writeAll(
+            \\usage: wgbank <option> [args]
+            \\options:
+            \\  list       - List all interfaces
+            \\  list  <if> - Display detailed view of an interface
+            \\  add   <name> <ip[/prefix]> - Add a new interface with name and IP/subnet
+            \\  peer  <if1> <if2>      - Peer two interfaces
+            \\  route <if> <router_if> - Peer two interfaces, where <if> accepts the entire subnet through <router_if>
+            \\  allow <if> <peer_if> <ip[/prefix]>   - Allow an IP or subnet into <if> from <peer_if>
+            \\  unallow <if> <peer_if> <ip[/prefix]> - Unallow an IP or subnet into <if> from <peer_if>
+            \\  unpeer <if1> <if2>   - Remove the connection between two interfaces
+            \\  remove <if>          - Remove an interface
+            \\  config <if>          - Export the configuration an interface in wg-quick format
+            \\  genpsk <if1> <if2>   - Generate a preshared key between two interfaces
+            \\  clearpsk <if1> <if2> - Remove the preshared key between two interfaces
+            \\
+    ) catch unreachable;
+    std.os.exit(1);
 }
 
 pub fn argInt(iter: *std.process.ArgIterator) !u64 {
