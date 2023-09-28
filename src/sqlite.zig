@@ -193,6 +193,7 @@ pub fn bind_internal(stmt: *c.sqlite3_stmt, values: anytype) !void {
                     else => { @compileError("Unsupported pointer size " ++ @tagName(ptr.size)); },
                 }
             },
+            .Null => c.sqlite3_bind_null(stmt, index),
             else => |ty| {
                 @compileError("Unsupported type " ++ @tagName(ty));
             },

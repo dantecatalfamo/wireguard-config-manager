@@ -131,10 +131,15 @@ pub const System = struct {
         try self.db.exec(allowed_ip_query, .{ peer_id, address, prefix });
     }
 
-    pub fn setPresharedKey(self: System, interface1_id: u64, interface2_id: u64, psk: []const u8) !void {
+    pub fn setPresharedKey(self: System, interface1_id: u64, interface2_id: u64, psk: ?[]const u8) !void {
         const query = "UPDATE peers SET psk = ? WHERE interface1 = ? AND interface2 = ?";
-        try self.db.exec(query, .{ psk, interface1_id, interface2_id });
-        try self.db.exec(query, .{ psk, interface2_id, interface1_id });
+        if (psk) |k| {
+            try self.db.exec(query, .{ k, interface1_id, interface2_id });
+            try self.db.exec(query, .{ k, interface2_id, interface1_id });
+        } else {
+            try self.db.exec(query, .{ null, interface1_id, interface2_id });
+            try self.db.exec(query, .{ null, interface2_id, interface1_id });
+        }
     }
 
     pub fn listInterfaces(system: System, writer: anytype) !void {
