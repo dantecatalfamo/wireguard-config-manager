@@ -142,6 +142,14 @@ pub const System = struct {
         }
     }
 
+    pub fn setField(self: System, interface_id: u64, field: []const u8, value: []const u8) !void {
+        _ = value;
+        _ = field;
+        _ = interface_id;
+        _ = self;
+
+    }
+
     pub fn listInterfaces(system: System, writer: anytype) !void {
         const query = "SELECT i.id, i.name, i.address, i.prefix, i.privkey, count(p.id), i.comment FROM interfaces i LEFT JOIN peers p ON i.id = p.interface1 GROUP BY i.id";
         const stmt = try system.db.prepare_bind(query, .{});

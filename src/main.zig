@@ -76,6 +76,11 @@ pub fn main() !void {
         const if1 = try argInt(&arg_iter);
         const if2 = try argInt(&arg_iter);
         try system.setPresharedKey(if1, if2, null);
+    } else if (mem.eql(u8, operation, "set")) {
+        const id = try argInt(&arg_iter);
+        const field = arg_iter.next() orelse usage();
+        const value = arg_iter.next() orelse usage();
+        try system.setField(id, field, value);
     } else if (mem.eql(u8, operation, "seed")) {
         const if1 = try system.addInterface("potato", "192.168.10.1", 24, null);
         const if2 = try system.addInterface("banana", "192.168.10.2", 24, null);
@@ -95,18 +100,27 @@ pub fn usage() noreturn {
     std.io.getStdErr().writer().writeAll(
             \\usage: wgbank <option> [args]
             \\options:
-            \\  list                                 List all interfaces
-            \\  list <if>                            Display detailed view of an interface
-            \\  add  <name> <ip[/prefix]>            Add a new interface with name and IP/subnet
-            \\  peer    <if1> <if2>                  Peer two interfaces
-            \\  unpeer  <if1> <if2>                  Remove the connection between two interfaces
-            \\  route   <if> <router_if>             Peer two interfaces, where <if> accepts the entire subnet through <router_if>
-            \\  allow   <if> <peer_if> <ip[/prefix]> Allow an IP or subnet into <if> from <peer_if>
-            \\  unallow <if> <peer_if> <ip[/prefix]> Unallow an IP or subnet into <if> from <peer_if>
-            \\  remove <if>                          Remove an interface
-            \\  config <if>                          Export the configuration an interface in wg-quick format
-            \\  genpsk   <if1> <if2>                 Generate a preshared key between two interfaces
-            \\  clearpsk <if1> <if2>                 Remove the preshared key between two interfaces
+            \\  list                                  List all interfaces
+            \\  list     <if>                         Display detailed view of an interface
+            \\  add      <name> <ip[/prefix]>         Add a new interface with name and IP/subnet
+            \\  peer     <if1> <if2>                  Peer two interfaces
+            \\  unpeer   <if1> <if2>                  Remove the connection between two interfaces
+            \\  route    <if> <router_if>             Peer two interfaces, where <if> accepts the entire subnet from <router_if>
+            \\  allow    <if> <peer_if> <ip[/prefix]> Allow an IP or subnet into <if> from <peer_if>
+            \\  unallow  <if> <peer_if> <ip[/prefix]> Unallow an IP or subnet into <if> from <peer_if>
+            \\  remove   <if>                         Remove an interface
+            \\  config   <if>                         Export the configuration an interface in wg-quick format
+            \\  genpsk   <if1> <if2>                  Generate a preshared key between two interfaces
+            \\  clearpsk <if1> <if2>                  Remove the preshared key between two interfaces
+            \\  set      <if> <field> <value>         Set a value for a field on an interface
+            \\fields:
+            \\  name
+            \\  comment
+            \\  privkey
+            \\  hostname
+            \\  address  (ip/prefix)
+            \\  port
+            \\  dns
             \\
     ) catch unreachable;
     std.os.exit(1);
