@@ -98,8 +98,8 @@ pub fn main() !void {
 
 pub fn usage() noreturn {
     std.io.getStdErr().writer().writeAll(
-            \\usage: wgbank <option> [args]
-            \\options:
+            \\usage: wgbank <command> [args]
+            \\commands:
             \\  list                                  List all interfaces
             \\  list     <if>                         Display detailed view of an interface
             \\  add      <name> <ip[/prefix]>         Add a new interface with name and IP/subnet
