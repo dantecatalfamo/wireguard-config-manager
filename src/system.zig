@@ -281,6 +281,49 @@ pub const System = struct {
         try allowed_ips_stmt.finalize();
     }
 
+    pub fn exportOpenBSD(system: System, interface_id: u64, writer: std.fs.File.Writer) !void {
+        const details_query = "SELECT address, prefix, privkey, port FROM interfaces WHERE id = ?";
+        const peers_query = "SELECT i.name, i.comment, i.privkey, i.hostname, i.port, p.id, p.psk FROM peers AS p JOIN interfaces AS i ON p.interface2 = i.id WHERE p.interface1 = ?";
+        const allowed_ips_query = "SELECT address, prefix FROM allowed_ips WHERE peer = ?";
+        const details_stmt = try system.db.prepare_bind(details_query, .{ interface_id });
+        const peers_stmt = try system.db.prepare_bind(peers_query, .{ interface_id });
+        const allowed_ips_stmt = try system.db.prepare(allowed_ips_query, null);
+
+        if (!try details_stmt.step())
+            return error.NoRecord;
+
+        try writer.print("inet {s}/{d}\n", .{ details_stmt.text(0).?, details_stmt.uint(1) });
+        try writer.print("wgkey {s}\n", .{ details_stmt.text(2).? });
+        if (details_stmt.uint(3) != 0)
+            try writer.print("wgport {d}\n", .{ details_stmt.uint(3) });
+
+        while (try peers_stmt.step()) {
+            try writer.print("wgpeer {s}", .{ try keypair.base64PrivateToPublic(peers_stmt.text(2).?) });
+            if (peers_stmt.text(6)) |psk| {
+                try writer.print(" wgpsk {s}", .{ psk });
+            }
+            try allowed_ips_stmt.reset();
+            try allowed_ips_stmt.bind(.{ peers_stmt.uint(5) });
+            while (try allowed_ips_stmt.step()) {
+                try writer.print(" wgaip {s}/{d}", .{ allowed_ips_stmt.text(0).?, allowed_ips_stmt.uint(1) });
+            }
+            if (peers_stmt.text(3)) |hostname| {
+                try writer.print(" wgendpoint {s} {d}", .{ hostname, peers_stmt.uint(4) });
+            }
+
+            try writer.print(" # {s}", .{ peers_stmt.text(0).? });
+            if (peers_stmt.text(1)) |comment| {
+                try writer.print(": {s}", .{ comment });
+            }
+            try writer.print("\n", .{});
+        }
+
+        try details_stmt.finalize();
+        try peers_stmt.finalize();
+        try allowed_ips_stmt.finalize();
+    }
+
+
     pub fn dump(self: System, dir: []const u8) !void {
         const query = "SELECT id, name FROM interfaces";
         try fs.cwd().makePath(dir);

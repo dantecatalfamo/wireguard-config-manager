@@ -113,6 +113,10 @@ pub fn main() !void {
             const id = try interfaceId(system, &arg_iter);
             try system.exportConf(id, stdout);
         },
+        .openbsd => {
+            const id = try interfaceId(system, &arg_iter);
+            try system.exportOpenBSD(id, stdout);
+        },
         .genpsk => {
             const if1 = try interfaceId(system, &arg_iter);
             const if2 = try interfaceId(system, &arg_iter);
@@ -184,6 +188,7 @@ pub const Command = enum {
     unallow,
     remove,
     @"export",
+    openbsd,
     genpsk,
     clearpsk,
     setpsk,
@@ -206,6 +211,7 @@ pub fn usage() noreturn {
             \\  unallow  <name> <peer_name> <ip[/prefix]> Unallow an IP or subnet into <name> from <peer_name>
             \\  remove   <name>                           Remove an interface
             \\  export   <name>                           Export the configuration for an interface in wg-quick format to stdout
+            \\  openbsd  <name>                           Export the configuration for an interface in OpenBSD hostname.if format to stdout
             \\  genpsk   <name1> <name2>                  Generate a preshared key between two interfaces
             \\  clearpsk <name1> <name2>                  Remove the preshared key between two interfaces
             \\  set      <name> <field> <value>           Set a value for a field on an interface
