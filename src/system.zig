@@ -13,7 +13,7 @@ pub const System = struct {
     db: sqlite.DB,
     allocator: mem.Allocator,
 
-    pub fn init(path: []const u8, allocator: mem.Allocator) !System {
+    pub fn init(path: [:0]const u8, allocator: mem.Allocator) !System {
         const schema = @embedFile("sql/schema.sql");
         const db = try sqlite.open(path);
         try db.exec_multiple(schema);

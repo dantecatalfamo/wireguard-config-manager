@@ -9,7 +9,7 @@ const c = @cImport({
     @cInclude("sqlite3.h");
 });
 
-pub fn open(path: []const u8) !DB {
+pub fn open(path: [:0]const u8) !DB {
     return DB{
         .ptr = try open_internal(path),
     };
@@ -134,7 +134,7 @@ pub const Stmt = struct {
     }
 };
 
-pub fn open_internal(path: []const u8) !*c.sqlite3 {
+pub fn open_internal(path: [:0]const u8) !*c.sqlite3 {
     var db: ?*c.sqlite3 = null;
     const ret = c.sqlite3_open_v2(path.ptr, &db, c.SQLITE_OPEN_READWRITE | c.SQLITE_OPEN_CREATE, null);
     if (ret != c.SQLITE_OK) {
