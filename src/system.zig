@@ -315,6 +315,7 @@ pub const System = struct {
     };
 
     pub fn verifyPrivkey(privkey: []const u8) !bool {
-        return 32 == try std.base64.standard.Decoder.calcSizeForSlice(privkey);
+        const keylen = try std.base64.standard.Decoder.calcSizeForSlice(privkey);
+        return 32 == keylen;
     }
 };

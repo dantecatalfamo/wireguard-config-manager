@@ -59,20 +59,38 @@ pub fn main() !void {
             const if1 = try interfaceId(system, &arg_iter);
             const if2 = try interfaceId(system, &arg_iter);
             checkPeering(if1, if2);
-            try system.addPeer(if1, if2);
+            system.addPeer(if1, if2) catch |err| switch (err) {
+                error.ConstraintFailed => {
+                    try stderr.print("Interfaces are already peered\n", .{});
+                    os.exit(1);
+                },
+                else => return err,
+            };
         },
         .route => {
             const if1 = try interfaceId(system, &arg_iter);
             const if2 = try interfaceId(system, &arg_iter);
             checkPeering(if1, if2);
-            try system.addRouter(if2, if1);
+            system.addRouter(if2, if1) catch |err| switch (err) {
+                error.ConstraintFailed => {
+                    try stderr.print("Interfaces are already peered\n", .{});
+                    os.exit(1);
+                },
+                else => return err,
+            };
         },
         .allow => {
             const if1 = try interfaceId(system, &arg_iter);
             const if2 = try interfaceId(system, &arg_iter);
             checkPeering(if1, if2);
             const addr_pfx = try System.parseAddrPrefix(arg_iter.next() orelse return error.MissingArg);
-            try system.addAllowedIP(if1, if2, addr_pfx.address, addr_pfx.prefix);
+            system.addAllowedIP(if1, if2, addr_pfx.address, addr_pfx.prefix) catch |err| switch (err) {
+                error.ConstraintFailed => {
+                    try stderr.print("IP range already allowed\n", .{});
+                    os.exit(1);
+                },
+                else => return err,
+            };
         },
         .unallow => {
             const if1 = try interfaceId(system, &arg_iter);
@@ -123,9 +141,16 @@ pub fn main() !void {
             const field = arg_iter.next() orelse usage();
             const value = arg_iter.next() orelse usage();
             if (std.meta.stringToEnum(System.Field, field)) |f| {
-                try system.setField(id, f, value);
+                system.setField(id, f, value) catch |err| switch (err) {
+                    error.ConstraintFailed => {
+                        try stderr.print("Change conflicts with another interface\n", .{});
+                        os.exit(1);
+                    },
+                    else => return err,
+                };
             } else {
-                return error.InvalidFieldName;
+                try stderr.print("Invalid field name\n", .{});
+                os.exit(1);
             }
         },
         .dump => {
@@ -142,7 +167,8 @@ pub fn main() !void {
             try system.addRouter(if1, if3);
             try system.addRouter(if1, if4);
 
-            try system.setPresharedKey(if1, if2, "DEADBEEF");
+            const test_psk = try keypair.generateKeyPair();
+            try system.setPresharedKey(if1, if2, &test_psk.privateBase64());
             try system.addPeer(if2, if3);
         }
     }
