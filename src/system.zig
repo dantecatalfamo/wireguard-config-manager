@@ -299,13 +299,13 @@ pub const System = struct {
 
         while (try peers_stmt.step()) {
             try writer.print("wgpeer {s}", .{ try keypair.base64PrivateToPublic(peers_stmt.text(2).?) });
-            if (peers_stmt.text(6)) |psk| {
-                try writer.print(" wgpsk {s}", .{ psk });
-            }
             try allowed_ips_stmt.reset();
             try allowed_ips_stmt.bind(.{ peers_stmt.uint(5) });
             while (try allowed_ips_stmt.step()) {
                 try writer.print(" wgaip {s}/{d}", .{ allowed_ips_stmt.text(0).?, allowed_ips_stmt.uint(1) });
+            }
+            if (peers_stmt.text(6)) |psk| {
+                try writer.print(" wgpsk {s}", .{ psk });
             }
             if (peers_stmt.text(3)) |hostname| {
                 try writer.print(" wgendpoint {s} {d}", .{ hostname, peers_stmt.uint(4) });
