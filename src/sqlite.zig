@@ -164,9 +164,7 @@ pub fn bind_internal(stmt: *c.sqlite3_stmt, values: anytype) !void {
         const value = @field(values, field.name);
         const index = idx + 1;
         const ret = switch (@typeInfo(@TypeOf(value))) {
-            .Int, .ComptimeInt => blk: {
-                break :blk c.sqlite3_bind_int64(stmt, index, @intCast(value));
-            },
+            .Int, .ComptimeInt => c.sqlite3_bind_int64(stmt, index, @intCast(value)),
             .Array => |arr| blk: {
                 if (arr.child != u8) {
                     @compileError("Unsupported array type " ++ @tagName(arr.child));
