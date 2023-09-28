@@ -66,6 +66,9 @@ pub fn main() !void {
     } else if (mem.eql(u8, operation, "remove")) {
         const id = try argInt(&arg_iter);
         try system.removeInterface(id);
+    } else if (mem.eql(u8, operation, "config")) {
+        const id = try argInt(&arg_iter);
+        try system.exportConf(id, stdout);
     } else if (mem.eql(u8, operation, "seed")) {
         const if1 = try system.addInterface("potato", "192.168.10.1", 24, null);
         const if2 = try system.addInterface("banana", "192.168.10.2", 24, null);

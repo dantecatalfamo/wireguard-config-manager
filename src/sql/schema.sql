@@ -8,14 +8,14 @@ CREATE TABLE IF NOT EXISTS interfaces (
     hostname TEXT,
     port INTEGER,
     address TEXT NOT NULL UNIQUE,
-    prefix INTEGER,
-    psk TEXT
+    prefix INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS peers (
     id INTEGER PRIMARY KEY,
     interface1 INTEGER NOT NULL,
     interface2 INTEGER NOT NULL,
+    psk TEXT,
     FOREIGN KEY (interface1) REFERENCES interfaces (id) ON DELETE CASCADE,
     FOREIGN KEY (interface2) REFERENCES interfaces (id) ON DELETE CASCADE,
     UNIQUE (interface1, interface2)
