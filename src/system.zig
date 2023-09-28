@@ -5,7 +5,6 @@ const mem = std.mem;
 const os = std.os;
 const testing = std.testing;
 
-const interface = @import("interface.zig");
 const keypair = @import("keypair.zig");
 const sqlite = @import("sqlite.zig");
 const add_router = @embedFile("sql/add_router.sql");
