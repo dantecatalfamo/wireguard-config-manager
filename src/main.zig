@@ -26,7 +26,6 @@ pub fn main() !void {
 
     const stdout = std.io.getStdOut().writer();
     const stderr = std.io.getStdErr().writer();
-    _ = stderr;
 
     var arg_iter = try std.process.argsWithAllocator(allocator);
     defer arg_iter.deinit();
@@ -47,34 +46,45 @@ pub fn main() !void {
         .add => {
             const name = arg_iter.next() orelse return error.MissingArg;
             const addr_pfx = try System.parseAddrPrefix(arg_iter.next() orelse return error.MissingArg);
-            const id = try system.addInterface(name, addr_pfx.address, addr_pfx.prefix, null);
+            const id = system.addInterface(name, addr_pfx.address, addr_pfx.prefix, null) catch |err| switch (err) {
+                error.ConstraintFailed => {
+                    try stderr.print("New interface conflicts with existing interface\n", .{});
+                    os.exit(1);
+                },
+                else => return err,
+            };
             try stdout.print("{d}\n", .{ id });
         },
         .peer => {
             const if1 = try interfaceId(system, &arg_iter);
             const if2 = try interfaceId(system, &arg_iter);
+            checkPeering(if1, if2);
             try system.addPeer(if1, if2);
         },
         .route => {
             const if1 = try interfaceId(system, &arg_iter);
             const if2 = try interfaceId(system, &arg_iter);
+            checkPeering(if1, if2);
             try system.addRouter(if2, if1);
         },
         .allow => {
             const if1 = try interfaceId(system, &arg_iter);
             const if2 = try interfaceId(system, &arg_iter);
+            checkPeering(if1, if2);
             const addr_pfx = try System.parseAddrPrefix(arg_iter.next() orelse return error.MissingArg);
             try system.addAllowedIP(if1, if2, addr_pfx.address, addr_pfx.prefix);
         },
         .unallow => {
             const if1 = try interfaceId(system, &arg_iter);
             const if2 = try interfaceId(system, &arg_iter);
+            checkPeering(if1, if2);
             const addr_pfx = try System.parseAddrPrefix(arg_iter.next() orelse return error.MissingArg);
             try system.removeAllowedIP(if1, if2, addr_pfx.address, addr_pfx.prefix);
         },
         .unpeer => {
             const if1 = try interfaceId(system, &arg_iter);
             const if2 = try interfaceId(system, &arg_iter);
+            checkPeering(if1, if2);
             try system.unPeer(if1, if2);
         },
         .remove => {
@@ -88,12 +98,14 @@ pub fn main() !void {
         .genpsk => {
             const if1 = try interfaceId(system, &arg_iter);
             const if2 = try interfaceId(system, &arg_iter);
+            checkPeering(if1, if2);
             const kp = try keypair.generateKeyPair();
             try system.setPresharedKey(if1, if2, &kp.privateBase64());
         },
         .setpsk => {
             const if1 = try interfaceId(system, &arg_iter);
             const if2 = try interfaceId(system, &arg_iter);
+            checkPeering(if1, if2);
             if (arg_iter.next()) |key| {
                 if (!try System.verifyPrivkey(key))
                     return error.InvalidKey;
@@ -103,6 +115,7 @@ pub fn main() !void {
         .clearpsk => {
             const if1 = try interfaceId(system, &arg_iter);
             const if2 = try interfaceId(system, &arg_iter);
+            checkPeering(if1, if2);
             try system.setPresharedKey(if1, if2, null);
         },
         .set => {
@@ -190,7 +203,14 @@ pub fn argInt(iter: *std.process.ArgIterator) !u64 {
 }
 
 pub fn interfaceId(system: System, iter: *std.process.ArgIterator) !u64 {
-    return try system.interfaceIdFromName(iter.next() orelse usage());
+    const name = iter.next() orelse usage();
+    return system.interfaceIdFromName(name) catch |err| switch (err) {
+        error.NoRecord => {
+            std.debug.print("Interface \"{s}\" does not exist\n", .{ name });
+            os.exit(1);
+        },
+        else => return err,
+    };
 }
 
 pub fn setupDbPath(allocator: mem.Allocator) ![:0]const u8 {
@@ -211,6 +231,13 @@ pub fn setupDbPath(allocator: mem.Allocator) ![:0]const u8 {
         return try fs.path.joinZ(allocator, &.{ dir_path, db_name });
     }
     return error.NoHomeDirectory;
+}
+
+pub fn checkPeering(if1: u64, if2: u64) void {
+    if (if1 == if2) {
+        std.debug.print("You cannot relate interfaces to themselves\n", .{});
+        os.exit(1);
+    }
 }
 
 test "ref all" {
