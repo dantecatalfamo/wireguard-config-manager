@@ -50,6 +50,11 @@ pub const System = struct {
         try self.db.exec(query, .{ interface_id });
     }
 
+    pub fn interfaceIdFromName(self: System, name: []const u8) !u64 {
+        const query = "SELECT id FROM interfaces WHERE name = ?";
+        return try self.db.exec_returning_int(query, .{ name });
+    }
+
     pub fn getInterface(self: System, id: u64) !Interface {
         const query = "SELECT id, name, comment, privkey, hostname, port, address, prefix, psk FROM interfaces WHERE id = ?";
         const stmt = try self.db.prepare_bind(query, .{ id });
@@ -142,13 +147,34 @@ pub const System = struct {
         }
     }
 
-    pub fn setField(self: System, interface_id: u64, field: []const u8, value: []const u8) !void {
-        _ = value;
-        _ = field;
-        _ = interface_id;
-        _ = self;
-
+    pub fn setField(self: System, interface_id: u64, field: Field, value: []const u8) !void {
+        switch (field) {
+            .name => try self.db.exec("UPDATE interfaces SET name = ? WHERE id = ?", .{ value, interface_id }),
+            .comment => try self.db.exec("UPDATE interfaces SET comment = ? WHERE id = ?", .{ value, interface_id }),
+            .privkey => {
+                if (!try verifyPrivkey(value))
+                    return error.InvalidKey;
+                try self.db.exec("UPDATE interfaces SET privkey = ? WHERE id = ?", .{ value, interface_id });
+            },
+            .hostname => try self.db.exec("UPDATE interfaces SET hostname = ? WHERE id = ?", .{ value, interface_id }),
+            .port => try self.db.exec("UPDATE interfaces SET port = ? WHERE id = ?", .{ try std.fmt.parseInt(u16, value, 10), interface_id }),
+            .address => {
+                const addr_pfx = try parseAddrPrefix(value);
+                try self.db.exec("UPDATE interfaces SET address = ?, prefix = ? WHERE id = ?", .{ addr_pfx.address, addr_pfx.prefix, interface_id });
+            },
+            .dns => try self.db.exec("UPDATE interfaces SET dns = ? WHERE id = ?", .{ value, interface_id }),
+        }
     }
+
+    pub const Field = enum {
+        name,
+        comment,
+        privkey,
+        hostname,
+        port,
+        address,
+        dns,
+    };
 
     pub fn listInterfaces(system: System, writer: anytype) !void {
         const query = "SELECT i.id, i.name, i.address, i.prefix, i.privkey, count(p.id), i.comment FROM interfaces i LEFT JOIN peers p ON i.id = p.interface1 GROUP BY i.id";
@@ -267,6 +293,26 @@ pub const System = struct {
         try details_stmt.finalize();
         try peers_stmt.finalize();
         try allowed_ips_stmt.finalize();
+    }
+
+    pub fn parseAddrPrefix(str: []const u8) !AddrPrefix {
+        var iter = mem.split(u8, str, "/");
+        const addr = iter.first();
+        const prefix_str = iter.next() orelse "32";
+        const prefix = try std.fmt.parseInt(u6, prefix_str, 10);
+        return .{
+            .address = addr,
+            .prefix = prefix
+        };
+    }
+
+    pub const AddrPrefix = struct {
+        address: []const u8,
+        prefix: u6,
+    };
+
+    pub fn verifyPrivkey(privkey: []const u8) !bool {
+        return 32 == try std.base64.standard.Decoder.calcSizeForSlice(privkey);
     }
 };
 
