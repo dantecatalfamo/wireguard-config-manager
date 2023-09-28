@@ -53,7 +53,9 @@ pub const System = struct {
     pub fn getInterface(self: System, id: u64) !Interface {
         const query = "SELECT id, name, comment, privkey, hostname, port, address, prefix, psk FROM interfaces WHERE id = ?";
         const stmt = try self.db.prepare_bind(query, .{ id });
-        _ = try stmt.step();
+        if (!try stmt.step()) {
+            return error.NoInterface;
+        }
         return  Interface{
             .allocator = self.allocator,
             .id = stmt.uint(0),
@@ -69,14 +71,22 @@ pub const System = struct {
     }
 
     pub fn addRouter(self: System, router_id: u64, client_id: u64) !void {
-        const router = try self.getInterface(router_id);
-        defer router.deinit();
-        const client = try self.getInterface(client_id);
-        defer client.deinit();
+        const query = "SELECT address, prefix FROM interfaces WHERE id = ?";
+        const stmt = try self.db.prepare(query, null);
+
+        try stmt.bind(.{ client_id });
+        if (!try stmt.step())
+            return error.NoRecord;
         const router_to_client = try self.addPeerEntry(router_id, client_id);
+        _ = try self.addAllowedIPEntry(router_to_client, stmt.text(0).?, 32);
+        try stmt.reset();
+
+        try stmt.bind(.{ router_id });
+        if (!try stmt.step())
+            return error.NoRecord;
         const client_to_router = try self.addPeerEntry(client_id, router_id);
-        _ = try self.addAllowedIPEntry(router_to_client, client.address, 32);
-        _ = try self.addAllowedIPEntry(client_to_router, router.address, router.prefix);
+        _ = try self.addAllowedIPEntry(client_to_router, stmt.text(0).?, @intCast(stmt.uint(1)));
+        try stmt.finalize();
     }
 
     pub fn addPeer(self: System, interface1_id: u64, interface2_id: u64) !void {
