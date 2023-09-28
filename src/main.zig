@@ -147,7 +147,7 @@ pub const Command = enum {
 
 pub fn usage() noreturn {
     std.io.getStdErr().writer().writeAll(
-            \\usage: wgbank <command> [args]
+            \\usage: wgcm <command> [args]
             \\commands:
             \\  list                                      List all interfaces
             \\  list     <name>                           Display detailed view of an interface
