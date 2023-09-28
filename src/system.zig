@@ -118,6 +118,9 @@ pub const System = struct {
     pub fn setPresharedKey(self: System, interface1_id: u64, interface2_id: u64, psk: ?[]const u8) !void {
         const query = "UPDATE peers SET psk = ? WHERE interface1 = ? AND interface2 = ?";
         if (psk) |k| {
+            if (!try verifyPrivkey(k)) {
+                return error.InvalidKey;
+            }
             try self.db.exec(query, .{ k, interface1_id, interface2_id });
             try self.db.exec(query, .{ k, interface2_id, interface1_id });
         } else {

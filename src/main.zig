@@ -19,7 +19,13 @@ pub fn main() !void {
 
 
     const db_path = try setupDbPath(allocator);
-    defer allocator.free(db_path);
+    defer {
+        // Path has trailing 0 sentinel that we need to free
+        var z_path = db_path;
+        z_path.len += 1;
+        allocator.free(z_path);
+    }
+
     const system = try System.init(db_path, allocator);
     defer system.close() catch unreachable;
 
