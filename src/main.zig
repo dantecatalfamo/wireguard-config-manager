@@ -9,11 +9,18 @@ const keypair = @import("keypair.zig");
 const sqlite = @import("sqlite.zig");
 const System = @import("system.zig").System;
 
+const config_dir_name = "wireguard-config-manager";
+const db_name = "wgcm.db";
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
-    const system = try System.init("/tmp/wgbank_test.db", allocator);
+
+
+    const db_path = try setupDbPath(allocator);
+    defer allocator.free(db_path);
+    const system = try System.init(db_path, allocator);
     defer system.close() catch unreachable;
 
     const stdout = std.io.getStdOut().writer();
@@ -183,6 +190,26 @@ pub fn argInt(iter: *std.process.ArgIterator) !u64 {
 
 pub fn interfaceId(system: System, iter: *std.process.ArgIterator) !u64 {
     return try system.interfaceIdFromName(iter.next() orelse usage());
+}
+
+pub fn setupDbPath(allocator: mem.Allocator) ![]const u8 {
+    var env = try std.process.getEnvMap(allocator);
+    defer env.deinit();
+    const xdg_config = env.get("XDG_CONFIG_HOME");
+    if (xdg_config) |config_path| {
+        const dir_path = try fs.path.join(allocator, &.{ config_path, config_dir_name });
+        defer allocator.free(dir_path);
+        try fs.cwd().makePath(dir_path);
+        return try fs.path.joinZ(allocator, &.{ dir_path, db_name });
+    }
+    const home = env.get("HOME");
+    if (home) |home_path| {
+        const dir_path = try fs.path.join(allocator, &.{ home_path, ".config", config_dir_name });
+        defer allocator.free(dir_path);
+        try fs.cwd().makePath(dir_path);
+        return try fs.path.joinZ(allocator, &.{ dir_path, db_name });
+    }
+    return error.NoHomeDirectory;
 }
 
 test "ref all" {
