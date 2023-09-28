@@ -19,12 +19,7 @@ pub fn main() !void {
 
 
     const db_path = try setupDbPath(allocator);
-    defer {
-        // Path has trailing 0 sentinel that we need to free
-        var z_path = db_path;
-        z_path.len += 1;
-        allocator.free(z_path);
-    }
+    defer allocator.free(db_path);
 
     const system = try System.init(db_path, allocator);
     defer system.close() catch unreachable;
@@ -198,7 +193,7 @@ pub fn interfaceId(system: System, iter: *std.process.ArgIterator) !u64 {
     return try system.interfaceIdFromName(iter.next() orelse usage());
 }
 
-pub fn setupDbPath(allocator: mem.Allocator) ![]const u8 {
+pub fn setupDbPath(allocator: mem.Allocator) ![:0]const u8 {
     var env = try std.process.getEnvMap(allocator);
     defer env.deinit();
     const xdg_config = env.get("XDG_CONFIG_HOME");
