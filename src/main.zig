@@ -29,9 +29,9 @@ pub fn main() !void {
 
     switch (command) {
         .list => {
-            if (arg_iter.next()) |id| {
-                const interface_id = try std.fmt.parseInt(u8, id, 10);
-                try system.listInterface(stdout, interface_id);
+            if (arg_iter.next()) |name| {
+                const id = try system.interfaceIdFromName(name);
+                try system.listInterface(stdout, id);
             } else {
                 try system.listInterfaces(stdout);
             }
@@ -43,49 +43,49 @@ pub fn main() !void {
             try stdout.print("{d}\n", .{ id });
         },
         .peer => {
-            const if1 = try argInt(&arg_iter);
-            const if2 = try argInt(&arg_iter);
+            const if1 = try interfaceId(system, &arg_iter);
+            const if2 = try interfaceId(system, &arg_iter);
             try system.addPeer(if1, if2);
         },
         .route => {
-            const if1 = try argInt(&arg_iter);
-            const if2 = try argInt(&arg_iter);
+            const if1 = try interfaceId(system, &arg_iter);
+            const if2 = try interfaceId(system, &arg_iter);
             try system.addRouter(if2, if1);
         },
         .allow => {
-            const if1 = try argInt(&arg_iter);
-            const if2 = try argInt(&arg_iter);
+            const if1 = try interfaceId(system, &arg_iter);
+            const if2 = try interfaceId(system, &arg_iter);
             const addr_pfx = try System.parseAddrPrefix(arg_iter.next() orelse return error.MissingArg);
             try system.addAllowedIP(if1, if2, addr_pfx.address, addr_pfx.prefix);
         },
         .unallow => {
-            const if1 = try argInt(&arg_iter);
-            const if2 = try argInt(&arg_iter);
+            const if1 = try interfaceId(system, &arg_iter);
+            const if2 = try interfaceId(system, &arg_iter);
             const addr_pfx = try System.parseAddrPrefix(arg_iter.next() orelse return error.MissingArg);
             try system.removeAllowedIP(if1, if2, addr_pfx.address, addr_pfx.prefix);
         },
         .unpeer => {
-            const if1 = try argInt(&arg_iter);
-            const if2 = try argInt(&arg_iter);
+            const if1 = try interfaceId(system, &arg_iter);
+            const if2 = try interfaceId(system, &arg_iter);
             try system.unPeer(if1, if2);
         },
         .remove => {
-            const id = try argInt(&arg_iter);
+            const id = try interfaceId(system, &arg_iter);
             try system.removeInterface(id);
         },
         .config => {
-            const id = try argInt(&arg_iter);
+            const id = try interfaceId(system, &arg_iter);
             try system.exportConf(id, stdout);
         },
         .genpsk => {
-            const if1 = try argInt(&arg_iter);
-            const if2 = try argInt(&arg_iter);
+            const if1 = try interfaceId(system, &arg_iter);
+            const if2 = try interfaceId(system, &arg_iter);
             const kp = try keypair.generateKeyPair();
             try system.setPresharedKey(if1, if2, &kp.privateBase64());
         },
         .setpsk => {
-            const if1 = try argInt(&arg_iter);
-            const if2 = try argInt(&arg_iter);
+            const if1 = try interfaceId(system, &arg_iter);
+            const if2 = try interfaceId(system, &arg_iter);
             if (arg_iter.next()) |key| {
                 if (!try System.verifyPrivkey(key))
                     return error.InvalidKey;
@@ -93,12 +93,12 @@ pub fn main() !void {
             }
         },
         .clearpsk => {
-            const if1 = try argInt(&arg_iter);
-            const if2 = try argInt(&arg_iter);
+            const if1 = try interfaceId(system, &arg_iter);
+            const if2 = try interfaceId(system, &arg_iter);
             try system.setPresharedKey(if1, if2, null);
         },
         .set => {
-            const id = try argInt(&arg_iter);
+            const id = try interfaceId(system, &arg_iter);
             const field = arg_iter.next() orelse usage();
             const value = arg_iter.next() orelse usage();
             if (std.meta.stringToEnum(System.Field, field)) |f| {
@@ -144,19 +144,19 @@ pub fn usage() noreturn {
     std.io.getStdErr().writer().writeAll(
             \\usage: wgbank <command> [args]
             \\commands:
-            \\  list                                  List all interfaces
-            \\  list     <if>                         Display detailed view of an interface
-            \\  add      <name> <ip[/prefix]>         Add a new interface with name and IP/subnet
-            \\  peer     <if1> <if2>                  Peer two interfaces
-            \\  unpeer   <if1> <if2>                  Remove the connection between two interfaces
-            \\  route    <if> <router_if>             Peer two interfaces, where <if> accepts the entire subnet from <router_if>
-            \\  allow    <if> <peer_if> <ip[/prefix]> Allow an IP or subnet into <if> from <peer_if>
-            \\  unallow  <if> <peer_if> <ip[/prefix]> Unallow an IP or subnet into <if> from <peer_if>
-            \\  remove   <if>                         Remove an interface
-            \\  config   <if>                         Export the configuration an interface in wg-quick format
-            \\  genpsk   <if1> <if2>                  Generate a preshared key between two interfaces
-            \\  clearpsk <if1> <if2>                  Remove the preshared key between two interfaces
-            \\  set      <if> <field> <value>         Set a value for a field on an interface
+            \\  list                                      List all interfaces
+            \\  list     <name>                           Display detailed view of an interface
+            \\  add      <name> <ip[/prefix]>             Add a new interface with name and IP/subnet
+            \\  peer     <name1> <name2>                  Peer two interfaces
+            \\  unpeer   <name1> <name2>                  Remove the connection between two interfaces
+            \\  route    <name> <router_name>             Peer two interfaces, where <name> accepts the entire subnet from <router_if>
+            \\  allow    <name> <peer_name> <ip[/prefix]> Allow an IP or subnet into <name> from <peer_name>
+            \\  unallow  <name> <peer_name> <ip[/prefix]> Unallow an IP or subnet into <name> from <peer_name>
+            \\  remove   <name>                           Remove an interface
+            \\  config   <name>                           Export the configuration an interface in wg-quick format
+            \\  genpsk   <name1> <name2>                  Generate a preshared key between two interfaces
+            \\  clearpsk <name1> <name2>                  Remove the preshared key between two interfaces
+            \\  set      <name> <field> <value>           Set a value for a field on an interface
             \\fields:
             \\  name
             \\  comment
@@ -173,6 +173,10 @@ pub fn usage() noreturn {
 pub fn argInt(iter: *std.process.ArgIterator) !u64 {
     const arg = iter.next() orelse return error.MissingArg;
     return try std.fmt.parseInt(u64, arg, 10);
+}
+
+pub fn interfaceId(system: System, iter: *std.process.ArgIterator) !u64 {
+    return try system.interfaceIdFromName(iter.next() orelse usage());
 }
 
 test "ref all" {

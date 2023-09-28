@@ -177,21 +177,20 @@ pub const System = struct {
     };
 
     pub fn listInterfaces(system: System, writer: anytype) !void {
-        const query = "SELECT i.id, i.name, i.address, i.prefix, i.privkey, count(p.id), i.comment FROM interfaces i LEFT JOIN peers p ON i.id = p.interface1 GROUP BY i.id";
+        const query = "SELECT i.name, i.address, i.prefix, i.privkey, count(p.id), i.comment FROM interfaces i LEFT JOIN peers p ON i.id = p.interface1 GROUP BY i.id";
         const stmt = try system.db.prepare_bind(query, .{});
-        try writer.print("ID |      Name      |       Address      |                  Public Key                  | Peers | Comment \n", .{});
-        try writer.print("---+----------------+--------------------+----------------------------------------------+-------+---------\n", .{});
+        try writer.print("     Name      |       Address      |                  Public Key                  | Peers | Comment \n", .{});
+        try writer.print("---------------+--------------------+----------------------------------------------+-------+---------\n", .{});
         while (try stmt.step()) {
             try writer.print(
-                "{d: <2} | {?s: <14} | {?s: <15}/{d: <2} | {s} | {d: <5} | {s}\n", .{
-                    stmt.uint(0),
+                "{?s: <14} | {?s: <15}/{d: <2} | {s} | {d: <5} | {s}\n", .{
+                    stmt.text(0),
                     stmt.text(1),
-                    stmt.text(2),
-                    stmt.uint(3),
-                    try keypair.base64PrivateToPublic(stmt.text(4) orelse ""),
-                    stmt.uint(5),
+                    stmt.uint(2),
+                    try keypair.base64PrivateToPublic(stmt.text(3) orelse ""),
+                    stmt.uint(4),
 
-                    stmt.text(6) orelse "",        });
+                    stmt.text(5) orelse "",        });
         }
     }
 
@@ -209,7 +208,6 @@ pub const System = struct {
 
         try writer.print("Interface details\n", .{});
         try writer.print("-----------------\n", .{});
-        try writer.print("ID: {d}\n", .{ details_stmt.uint(0) });
         try writer.print("Name: {s}\n", .{ details_stmt.text(1) orelse "" });
         try writer.print("Comment: {s}\n", .{ details_stmt.text(2) orelse "" });
         try writer.print("Public Key: {s}\n", .{ try keypair.base64PrivateToPublic(details_stmt.text(3) orelse "") });
@@ -225,10 +223,10 @@ pub const System = struct {
 
         try writer.print("\nPeers\n", .{});
         try writer.print("-----\n", .{});
-        try writer.print("ID |      Name      |                  Preshared Key               |   Allowed IPs    \n", .{});
-        try writer.print("---+----------------+----------------------------------------------+------------------\n", .{});
+        try writer.print("     Name      |                  Preshared Key               |   Allowed IPs    \n", .{});
+        try writer.print("---------------+----------------------------------------------+------------------\n", .{});
         while (try peers_stmt.step()) {
-            try writer.print("{d: <2} | {s: <14} | {s: <44} | ", .{ peers_stmt.uint(0), peers_stmt.text(1) orelse "", peers_stmt.text(2) orelse "" });
+            try writer.print("{s: <14} | {s: <44} | ", .{ peers_stmt.text(1) orelse "", peers_stmt.text(2) orelse "" });
             try allowed_ips_stmt.reset();
             try allowed_ips_stmt.bind(.{ peers_stmt.int(3) });
             while (try allowed_ips_stmt.step()) {
