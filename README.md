@@ -5,7 +5,8 @@ Command line wireguard configuration manager
 ```
 usage: wgcm <command> [args]
 commands:
-  list                                      List all interfaces
+  names                                     List just interface names
+  list                                      List interfaces and some details
   list     <name>                           Display detailed view of an interface
   add      <name> <ip[/prefix]>             Add a new interface with name and IP/subnet
   peer     <name1> <name2>                  Peer two interfaces
@@ -20,6 +21,7 @@ commands:
   clearpsk <name1> <name2>                  Remove the preshared key between two interfaces
   set      <name> <field> <value>           Set a value for a field on an interface
   dump     <directory>                      Export all configuration files to a directory
+  bash                                      Print bash completion code to stdout
 fields:
   name
   comment
