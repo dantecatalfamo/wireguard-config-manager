@@ -1,6 +1,10 @@
 # wireguard-config-manager
 Command line wireguard configuration manager
 
+## Demo
+
+https://asciinema.org/a/uDC4RKB2vfSRN3YJeUjNBwKL5
+
 ## Usage
 ```
 usage: wgcm <command> [args]
