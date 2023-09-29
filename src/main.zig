@@ -163,6 +163,10 @@ pub fn main() !void {
             const dir = arg_iter.next() orelse usage();
             try system.dump(dir);
         },
+        .bash => {
+            const contents = @embedFile("completion.bash");
+            try stdout.print("{s}\n", .{ contents });
+        },
         .seed => {
             const if1 = try system.addInterface("potato", "192.168.10.1", 24, null);
             const if2 = try system.addInterface("banana", "192.168.10.2", 24, null);
@@ -197,6 +201,7 @@ pub const Command = enum {
     setpsk,
     set,
     dump,
+    bash,
     seed,
 };
 
@@ -220,6 +225,7 @@ pub fn usage() noreturn {
             \\  clearpsk <name1> <name2>                  Remove the preshared key between two interfaces
             \\  set      <name> <field> <value>           Set a value for a field on an interface
             \\  dump     <directory>                      Export all configuration files to a directory
+            \\  bash                                      Print bash completion code to stdout
             \\fields:
             \\  name
             \\  comment
