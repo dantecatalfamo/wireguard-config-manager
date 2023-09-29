@@ -67,8 +67,7 @@ function _wgcm_completions {
         set)
             if [ "${#COMP_WORDS[@]}" -eq 3 ]; then
                 COMPREPLY=($(compgen -W "$(wgcm names)" "${COMP_WORDS[-1]}"))
-            fi
-            if [ "${#COMP_WORDS[@]}" -eq 4 ]; then
+            elif [ "${#COMP_WORDS[@]}" -eq 4 ]; then
                 COMPREPLY=($(compgen -W "name comment privkey hostname address port dns" "${COMP_WORDS[-1]}"))
             fi
         ;;
