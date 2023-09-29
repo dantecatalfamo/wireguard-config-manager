@@ -41,6 +41,14 @@ fields:
 Using the latest master build of zig
 - `zig build -Doptimize=ReleaseSafe`
 
+## Completion
+
+To enable bash tab completion, add the following to your `.bashrc`.
+
+```bash
+eval "$(wgcm bash)"
+```
+
 ## Database location
 
 The default database is located at `~/.config/wireguard-config-manager/wgcm.db`
