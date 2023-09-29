@@ -80,14 +80,8 @@ pub const DB = struct {
     }
 
     fn query_empty(query: []const u8) bool {
-        for (query) |char| {
-            if (!std.ascii.isWhitespace(char)) {
-                return false;
-            }
-        }
-        return true;
+        return std.mem.lastIndexOfNone(u8, query, &std.ascii.whitespace) == null;
     }
-
 
     pub fn close(self: DB) !void {
         return close_internal(self.ptr);
