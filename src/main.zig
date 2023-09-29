@@ -44,8 +44,8 @@ pub fn main() !void {
             }
         },
         .add => {
-            const name = arg_iter.next() orelse return error.MissingArg;
-            const addr_pfx = try System.parseAddrPrefix(arg_iter.next() orelse return error.MissingArg);
+            const name = arg_iter.next() orelse usage();
+            const addr_pfx = try System.parseAddrPrefix(arg_iter.next() orelse usage());
             _ = system.addInterface(name, addr_pfx.address, addr_pfx.prefix, null) catch |err| switch (err) {
                 error.ConstraintFailed => {
                     try stderr.print("New interface conflicts with existing interface\n", .{});
@@ -82,7 +82,7 @@ pub fn main() !void {
             const if1 = try interfaceId(system, &arg_iter);
             const if2 = try interfaceId(system, &arg_iter);
             checkPeering(if1, if2);
-            const addr_pfx = try System.parseAddrPrefix(arg_iter.next() orelse return error.MissingArg);
+            const addr_pfx = try System.parseAddrPrefix(arg_iter.next() orelse usage());
             system.addAllowedIP(if1, if2, addr_pfx.address, addr_pfx.prefix) catch |err| switch (err) {
                 error.ConstraintFailed => {
                     try stderr.print("IP range already allowed\n", .{});
@@ -95,7 +95,7 @@ pub fn main() !void {
             const if1 = try interfaceId(system, &arg_iter);
             const if2 = try interfaceId(system, &arg_iter);
             checkPeering(if1, if2);
-            const addr_pfx = try System.parseAddrPrefix(arg_iter.next() orelse return error.MissingArg);
+            const addr_pfx = try System.parseAddrPrefix(arg_iter.next() orelse usage());
             try system.removeAllowedIP(if1, if2, addr_pfx.address, addr_pfx.prefix);
         },
         .unpeer => {
@@ -229,7 +229,7 @@ pub fn usage() noreturn {
 }
 
 pub fn argInt(iter: *std.process.ArgIterator) !u64 {
-    const arg = iter.next() orelse return error.MissingArg;
+    const arg = iter.next() orelse usage();
     return try std.fmt.parseInt(u64, arg, 10);
 }
 
