@@ -2,7 +2,7 @@
 
 function _wgcm_completions {
     if [ "${#COMP_WORDS[@]}" -eq 2 ]; then
-        COMPREPLY=($(compgen -W "add peer unpeer route allow unallow remove export openbsd genpsk clearpsk set dump bash" "${COMP_WORDS[1]}"))
+        COMPREPLY=($(compgen -W "list add peer unpeer route allow unallow remove export openbsd genpsk clearpsk set dump bash" "${COMP_WORDS[1]}"))
     fi
     case "${COMP_WORDS[1]}" in
         list)
