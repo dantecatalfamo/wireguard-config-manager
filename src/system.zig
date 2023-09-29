@@ -176,6 +176,14 @@ pub const System = struct {
         }
     }
 
+    pub fn listNames(self: System, writer: anytype) !void {
+        const query = "SELECT name FROM interfaces ORDER BY name";
+        const stmt = try self.db.prepare(query, null);
+        while (try stmt.step()) {
+            try writer.print("{s}\n", .{ stmt.text(0) orelse "" });
+        }
+    }
+
     pub fn listInterface(system: System, writer: anytype, interface_id: u64) !void {
         const details_query = "SELECT id, name, comment, privkey, hostname, address, prefix, port, dns FROM interfaces WHERE id = ?";
         const peers_query = "SELECT i.id, i.name, p.psk, p.id FROM peers AS p JOIN interfaces AS i ON p.interface2 = i.id WHERE p.interface1 = ?";
@@ -227,7 +235,7 @@ pub const System = struct {
         try allowed_ips_stmt.finalize();
     }
 
-    pub fn exportConf(system: System, interface_id: u64, writer: std.fs.File.Writer) !void {
+    pub fn exportConf(system: System, interface_id: u64, writer: anytype) !void {
         const details_query = "SELECT address, prefix, privkey, port FROM interfaces WHERE id = ?";
         const peers_query = "SELECT i.name, i.comment, i.privkey, i.hostname, i.port, p.id, p.psk FROM peers AS p JOIN interfaces AS i ON p.interface2 = i.id WHERE p.interface1 = ?";
         const allowed_ips_query = "SELECT address, prefix FROM allowed_ips WHERE peer = ?";
@@ -281,7 +289,7 @@ pub const System = struct {
         try allowed_ips_stmt.finalize();
     }
 
-    pub fn exportOpenBSD(system: System, interface_id: u64, writer: std.fs.File.Writer) !void {
+    pub fn exportOpenBSD(system: System, interface_id: u64, writer: anytype) !void {
         const details_query = "SELECT address, prefix, privkey, port FROM interfaces WHERE id = ?";
         const peers_query = "SELECT i.name, i.comment, i.privkey, i.hostname, i.port, p.id, p.psk FROM peers AS p JOIN interfaces AS i ON p.interface2 = i.id WHERE p.interface1 = ?";
         const allowed_ips_query = "SELECT address, prefix FROM allowed_ips WHERE peer = ?";

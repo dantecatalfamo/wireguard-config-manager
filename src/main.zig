@@ -43,6 +43,9 @@ pub fn main() !void {
                 try system.listInterfaces(stdout);
             }
         },
+        .names => {
+            try system.listNames(stdout);
+        },
         .add => {
             const name = arg_iter.next() orelse usage();
             const addr_pfx = try System.parseAddrPrefix(arg_iter.next() orelse usage());
@@ -179,6 +182,7 @@ pub fn main() !void {
 
 pub const Command = enum {
     list,
+    names,
     add,
     peer,
     unpeer,
@@ -200,7 +204,8 @@ pub fn usage() noreturn {
     std.io.getStdErr().writer().writeAll(
             \\usage: wgcm <command> [args]
             \\commands:
-            \\  list                                      List all interfaces
+            \\  names                                     List just interface names
+            \\  list                                      List interfaces and some details
             \\  list     <name>                           Display detailed view of an interface
             \\  add      <name> <ip[/prefix]>             Add a new interface with name and IP/subnet
             \\  peer     <name1> <name2>                  Peer two interfaces
