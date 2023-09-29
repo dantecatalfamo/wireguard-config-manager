@@ -15,27 +15,27 @@ function _wgcm_completions {
         add)
         ;;
         peer)
-            if [ "${#COMP_WORDS[@]}" -eq 4 ]; then
+            if [ "${#COMP_WORDS[@]}" -lt 5 ]; then
                 COMPREPLY=($(compgen -W "$(wgcm names)" "${COMP_WORDS[-1]}"))
             fi
         ;;
         unpeer)
-            if [ "${#COMP_WORDS[@]}" -eq 4 ]; then
+            if [ "${#COMP_WORDS[@]}" -lt 5 ]; then
                 COMPREPLY=($(compgen -W "$(wgcm names)" "${COMP_WORDS[-1]}"))
             fi
         ;;
         route)
-            if [ "${#COMP_WORDS[@]}" -eq 4 ]; then
+            if [ "${#COMP_WORDS[@]}" -lt 5 ]; then
                 COMPREPLY=($(compgen -W "$(wgcm names)" "${COMP_WORDS[-1]}"))
             fi
         ;;
         allow)
-            if [ "${#COMP_WORDS[@]}" -eq 4 ]; then
+            if [ "${#COMP_WORDS[@]}" -lt 5 ]; then
                 COMPREPLY=($(compgen -W "$(wgcm names)" "${COMP_WORDS[-1]}"))
             fi
         ;;
         unallow)
-            if [ "${#COMP_WORDS[@]}" -eq 4 ]; then
+            if [ "${#COMP_WORDS[@]}" -lt 5 ]; then
                 COMPREPLY=($(compgen -W "$(wgcm names)" "${COMP_WORDS[-1]}"))
             fi
         ;;
@@ -55,12 +55,12 @@ function _wgcm_completions {
             fi
         ;;
         genpsk)
-            if [ "${#COMP_WORDS[@]}" -eq 4 ]; then
+            if [ "${#COMP_WORDS[@]}" -lt 5 ]; then
                 COMPREPLY=($(compgen -W "$(wgcm names)" "${COMP_WORDS[-1]}"))
             fi
         ;;
         clearpsk)
-            if [ "${#COMP_WORDS[@]}" -eq 4 ]; then
+            if [ "${#COMP_WORDS[@]}" -lt 5 ]; then
                 COMPREPLY=($(compgen -W "$(wgcm names)" "${COMP_WORDS[-1]}"))
             fi
         ;;
