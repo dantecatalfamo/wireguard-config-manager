@@ -36,11 +36,25 @@ pub fn main() !void {
 
     switch (command) {
         .list => {
+            var env = try std.process.getEnvMap(allocator);
+            defer env.deinit();
+            var output_format: System.OutputType = .table;
+            if (env.get("WGCM_OUTPUT")) |wgcm_json| {
+                if (mem.eql(u8, wgcm_json, "json")) {
+                    output_format = .json;
+                }
+            }
             if (arg_iter.next()) |name| {
-                const id = try system.interfaceIdFromName(name);
-                try system.listInterface(stdout, id);
+                const id = system.interfaceIdFromName(name)  catch |err| switch (err) {
+                    error.NoRecord => {
+                        try stderr.print("No interface \"{s}\"\n", .{ name });
+                        os.exit(1);
+                    },
+                    else => return err,
+                };
+                try system.listInterface(id, output_format, stdout);
             } else {
-                try system.listInterfaces(stdout);
+                try system.listInterfaces(output_format, stdout);
             }
         },
         .names => {

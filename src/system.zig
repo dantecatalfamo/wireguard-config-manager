@@ -3,6 +3,7 @@ const debug = std.debug;
 const fs = std.fs;
 const mem = std.mem;
 const os = std.os;
+const json = std.json;
 const testing = std.testing;
 
 const keypair = @import("keypair.zig");
@@ -158,21 +159,51 @@ pub const System = struct {
         dns,
     };
 
-    pub fn listInterfaces(system: System, writer: anytype) !void {
+    pub fn listInterfaces(system: System, output_type: OutputType, writer: anytype) !void {
         const query = "SELECT i.name, i.address, i.prefix, i.privkey, count(p.id), i.comment FROM interfaces i LEFT JOIN peers p ON i.id = p.interface1 GROUP BY i.id";
         const stmt = try system.db.prepare_bind(query, .{});
-        try writer.print("     Name      |       Address      |                  Public Key                  | Peers | Comment \n", .{});
-        try writer.print("---------------+--------------------+----------------------------------------------+-------+---------\n", .{});
+        switch (output_type) {
+            .table => {
+                try writer.print("     Name      |       Address      |                  Public Key                  | Peers | Comment \n", .{});
+                try writer.print("---------------+--------------------+----------------------------------------------+-------+---------\n", .{});
+            },
+            .json => {
+                try writer.print("[", .{});
+            }
+        }
+        var first = true;
         while (try stmt.step()) {
-            try writer.print(
-                "{?s: <14} | {?s: <15}/{d: <2} | {s} | {d: <5} | {s}\n", .{
-                    stmt.text(0),
-                    stmt.text(1),
-                    stmt.uint(2),
-                    try keypair.base64PrivateToPublic(stmt.text(3) orelse ""),
-                    stmt.uint(4),
-
-                    stmt.text(5) orelse "",        });
+            switch (output_type) {
+                .table => {
+                    try writer.print(
+                        "{?s: <14} | {?s: <15}/{d: <2} | {s} | {d: <5} | {s}\n", .{
+                            stmt.text(0),
+                            stmt.text(1),
+                            stmt.uint(2),
+                            try keypair.base64PrivateToPublic(stmt.text(3) orelse ""),
+                            stmt.uint(4),
+                            stmt.text(5) orelse "",        });
+                },
+                .json => {
+                    if (first) {
+                        first = false;
+                    } else {
+                        try writer.print(",\n", .{});
+                    }
+                    const obj = .{
+                        .name = stmt.text(0),
+                        .address = stmt.text(1),
+                        .prefix = stmt.uint(2),
+                        .pubkey = try keypair.base64PrivateToPublic(stmt.text(3) orelse ""),
+                        .peers = stmt.uint(4),
+                        .comment = stmt.text(5) orelse "",
+                    };
+                    try std.json.stringify(obj, .{}, writer);
+                }
+            }
+        }
+        if (output_type == .json) {
+            try writer.print("]\n", .{});
         }
     }
 
@@ -184,7 +215,7 @@ pub const System = struct {
         }
     }
 
-    pub fn listInterface(system: System, writer: anytype, interface_id: u64) !void {
+    pub fn listInterface(system: System, interface_id: u64, output_type: OutputType, writer: anytype) !void {
         const details_query = "SELECT id, name, comment, privkey, hostname, address, prefix, port, dns FROM interfaces WHERE id = ?";
         const peers_query = "SELECT i.id, i.name, p.psk, p.id FROM peers AS p JOIN interfaces AS i ON p.interface2 = i.id WHERE p.interface1 = ?";
         const allowed_ips_query = "SELECT address, prefix FROM allowed_ips WHERE peer = ?";
@@ -196,40 +227,108 @@ pub const System = struct {
             return;
         }
 
-        try writer.print("Interface details\n", .{});
-        try writer.print("-----------------\n", .{});
-        try writer.print("Name: {s}\n", .{ details_stmt.text(1) orelse "" });
-        try writer.print("Comment: {s}\n", .{ details_stmt.text(2) orelse "" });
-        try writer.print("Public Key: {s}\n", .{ try keypair.base64PrivateToPublic(details_stmt.text(3) orelse "") });
-        try writer.print("Private Key: {s}\n", .{ details_stmt.text(3) orelse "" });
-        try writer.print("Hostname: {s}\n", .{ details_stmt.text(4) orelse "" });
-        try writer.print("Address: {s}/{d}\n", .{ details_stmt.text(5) orelse "", details_stmt.uint(6) });
-        if (details_stmt.uint(7) == 0) {
-            try writer.print("Port:\n", .{});
-        } else {
-            try writer.print("Port: {d}\n", .{ details_stmt.uint(7) });
-        }
-        try writer.print("DNS: {s}\n", .{ details_stmt.text(8) orelse "" });
+        switch (output_type) {
+            .table => {
+                try writer.print("Interface details\n", .{});
+                try writer.print("-----------------\n", .{});
+                try writer.print("Name: {s}\n", .{ details_stmt.text(1) orelse "" });
+                try writer.print("Comment: {s}\n", .{ details_stmt.text(2) orelse "" });
+                try writer.print("Public Key: {s}\n", .{ if (details_stmt.text(3)) |priv| &(try keypair.base64PrivateToPublic(priv)) else "" });
+                try writer.print("Private Key: {s}\n", .{ details_stmt.text(3) orelse "" });
+                try writer.print("Hostname: {s}\n", .{ details_stmt.text(4) orelse "" });
+                try writer.print("Address: {s}/{d}\n", .{ details_stmt.text(5) orelse "", details_stmt.uint(6) });
+                if (details_stmt.uint(7) == 0) {
+                    try writer.print("Port:\n", .{});
+                } else {
+                    try writer.print("Port: {d}\n", .{ details_stmt.uint(7) });
+                }
+                try writer.print("DNS: {s}\n", .{ details_stmt.text(8) orelse "" });
 
-        try writer.print("\nPeers\n", .{});
-        try writer.print("-----\n", .{});
-        try writer.print("     Name      |                  Preshared Key               |   Allowed IPs    \n", .{});
-        try writer.print("---------------+----------------------------------------------+------------------\n", .{});
+                try writer.print("\nPeers\n", .{});
+                try writer.print("-----\n", .{});
+                try writer.print("     Name      |                  Preshared Key               |   Allowed IPs    \n", .{});
+                try writer.print("---------------+----------------------------------------------+------------------\n", .{});
+            },
+            .json => {
+                try writer.print("{{\"name\":", .{});
+                try json.stringify(details_stmt.text(1), .{}, writer);
+                try writer.print(",\"comment\":", .{});
+                try json.stringify(details_stmt.text(2), .{}, writer);
+                try writer.print(",\"pubkey\":", .{});
+                try json.stringify(if (details_stmt.text(3)) |priv| try keypair.base64PrivateToPublic(priv) else null, .{}, writer);
+                try writer.print(",\"privkey\":", .{});
+                try json.stringify(details_stmt.text(3), .{}, writer);
+                try writer.print(",\"hostname\":", .{});
+                try json.stringify(details_stmt.text(4), .{}, writer);
+                try writer.print(",\"address\":", .{});
+                try json.stringify(details_stmt.text(5), .{}, writer);
+                try writer.print(",\"prefix\":", .{});
+                try json.stringify(details_stmt.uint(6), .{}, writer);
+                try writer.print(",\"port\":", .{});
+                try json.stringify(if (details_stmt.uint(7) == 0) null else details_stmt.uint(7), .{}, writer);
+                try writer.print(",\"dns\":", .{});
+                try json.stringify(details_stmt.text(8), .{}, writer);
+                try writer.print(",\"peers\":[", .{});
+            }
+        }
+
+        var first_peer = true;
         while (try peers_stmt.step()) {
-            try writer.print("{s: <14} | {s: <44} | ", .{ peers_stmt.text(1) orelse "", peers_stmt.text(2) orelse "" });
+            switch (output_type) {
+                .table => {
+                    try writer.print("{s: <14} | {s: <44} | ", .{ peers_stmt.text(1) orelse "", peers_stmt.text(2) orelse "" });
+                },
+                .json => {
+                    if (first_peer) {
+                        first_peer = false;
+                    } else {
+                        try writer.print(",", .{});
+                    }
+                    try writer.print("{{\"name\":", .{});
+                    try json.stringify(peers_stmt.text(1), .{}, writer);
+                    try writer.print(",\"psk\":", .{});
+                    try json.stringify(peers_stmt.text(2), .{}, writer);
+                    try writer.print(",\"allowed_ips\":[", .{});
+                }
+            }
             try allowed_ips_stmt.reset();
             try allowed_ips_stmt.bind(.{ peers_stmt.int(3) });
-            var first = true;
+            var first_ip = true;
             while (try allowed_ips_stmt.step()) {
-                if (first) {
-                    first = false;
-                } else {
-                    try writer.print(", ", .{});
+                switch (output_type) {
+                    .table => {
+                        if (first_ip) {
+                            first_ip = false;
+                        } else {
+                            try writer.print(", ", .{});
+                        }
+                        try writer.print("{s}/{d}", .{ allowed_ips_stmt.text(0).?, allowed_ips_stmt.uint(1) });
+                    },
+                    .json => {
+                        if (first_ip) {
+                            first_ip = false;
+                        } else {
+                            try writer.print(",", .{});
+                        }
+                        try writer.print("{{\"address\":", .{});
+                        try json.stringify(allowed_ips_stmt.text(0), .{}, writer);
+                        try writer.print(",\"prefix\":", .{});
+                        try json.stringify(allowed_ips_stmt.uint(1), .{}, writer);
+                        try writer.print("}}", .{});
+                    }
                 }
-                try writer.print("{s}/{d}", .{ allowed_ips_stmt.text(0).?, allowed_ips_stmt.uint(1) });
             }
-            try writer.print("\n", .{});
+            switch (output_type) {
+                .table => try writer.print("\n", .{}),
+                .json => try writer.print("]}}", .{}),
+            }
         }
+
+        switch (output_type) {
+            .json => try writer.print("]}}\n", .{}),
+            else => {}
+        }
+
         try details_stmt.finalize();
         try peers_stmt.finalize();
         try allowed_ips_stmt.finalize();
@@ -369,4 +468,9 @@ pub const System = struct {
         const keylen = try std.base64.standard.Decoder.calcSizeForSlice(privkey);
         return 32 == keylen;
     }
+
+    pub const OutputType = enum {
+        table,
+        json,
+    };
 };

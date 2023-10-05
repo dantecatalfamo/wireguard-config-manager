@@ -36,6 +36,15 @@ fields:
   dns
 ```
 
+## JSON Output
+
+To print JSON output instead of human-readable tables, set the environment variable `WGCM_OUTPUT=json`.
+
+Example:
+```zig
+WGCM_OUTPUT=json wgcm list
+```
+
 ## Dependencies
 
 - `sqlite3`
