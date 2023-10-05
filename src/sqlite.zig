@@ -86,6 +86,17 @@ pub const DB = struct {
     pub fn close(self: DB) !void {
         return close_internal(self.ptr);
     }
+
+    pub fn getUserVersion(self: DB) !u32 {
+        return @intCast(try self.exec_returning_int("PRAGMA user_version", .{}));
+    }
+
+    pub fn setUserVersion(self: DB, value: u32) !void {
+        var buffer: [50]u8 = undefined;
+        var stream = std.io.fixedBufferStream(&buffer);
+        try stream.writer().print("PRAGMA user_version = {d}", .{ value });
+        try self.exec(stream.getWritten(), .{});
+    }
 };
 
 pub const Stmt = struct {

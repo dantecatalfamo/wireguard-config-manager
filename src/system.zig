@@ -33,6 +33,14 @@ pub const System = struct {
         try self.db.close();
     }
 
+    pub fn getVersion(self: System) !u32 {
+        return try self.db.getUserVersion();
+    }
+
+    pub fn setVersion(self: System, version: u32) !void {
+        try self.db.setUserVersion(version);
+    }
+
     pub fn addInterface(self: System, name: []const u8, address: []const u8, prefix: u6, privkey: ?[32]u8) !u64 {
         const query = "INSERT INTO interfaces (name, address, prefix, privkey) VALUES (?, ?, ?, ?) RETURNING id";
         const kp = if (privkey) |pk|
