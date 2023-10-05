@@ -24,7 +24,8 @@ pub fn main() !void {
     const system = try System.init(db_path, allocator);
     defer system.close() catch unreachable;
 
-    const stdout = std.io.getStdOut().writer();
+    var stdout_buffer = std.io.bufferedWriter(std.io.getStdOut().writer());
+    const stdout = stdout_buffer.writer();
     const stderr = std.io.getStdErr().writer();
 
     var arg_iter = try std.process.argsWithAllocator(allocator);
@@ -196,6 +197,8 @@ pub fn main() !void {
             try system.addPeer(if2, if3);
         }
     }
+
+    try stdout_buffer.flush();
 }
 
 pub const Command = enum {
