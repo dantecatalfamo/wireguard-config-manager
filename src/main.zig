@@ -17,7 +17,6 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-
     const db_path = try setupDbPath(allocator);
     defer allocator.free(db_path);
 

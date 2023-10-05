@@ -8,25 +8,29 @@ const testing = std.testing;
 
 const keypair = @import("keypair.zig");
 const sqlite = @import("sqlite.zig");
-const add_router = @embedFile("sql/add_router.sql");
+const schema = @embedFile("sql/schema.sql");
+const current_schema_version = 1;
 
 pub const System = struct {
     db: sqlite.DB,
     allocator: mem.Allocator,
 
     pub fn init(path: [:0]const u8, allocator: mem.Allocator) !System {
-        const schema = @embedFile("sql/schema.sql");
         const db = try sqlite.open(path);
-        try db.exec_multiple(schema);
-        return System{
+        const system = System{
             .db = db,
             .allocator = allocator,
         };
+        try system.migrate();
+        return system;
     }
 
-    fn create_tables(self: System) !void {
-        const schema = @embedFile("schema.sql");
-        try self.db.exec_multiple(schema);
+    pub fn migrate(self: System) !void {
+        const schema_version = try self.getVersion();
+        if (schema_version == 0) {
+            try self.db.exec_multiple(schema);
+            try self.setVersion(current_schema_version);
+        }
     }
 
     pub fn close(self: System) !void {
