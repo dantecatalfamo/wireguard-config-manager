@@ -536,8 +536,8 @@ pub const System = struct {
     }
 
     pub fn exportConf(system: System, interface_id: u64, writer: anytype) !void {
-        const details_query = "SELECT address, prefix, privkey, port FROM interfaces WHERE id = ?";
-        const peers_query = "SELECT i.name, i.comment, i.privkey, i.hostname, i.port, p.id, p.psk FROM peers AS p JOIN interfaces AS i ON p.interface2 = i.id WHERE p.interface1 = ?";
+        const details_query = "SELECT address, prefix, privkey, dns, port, routing_table, mtu, pre_up, post_up, pre_down, post_down FROM interfaces WHERE id = ?";
+        const peers_query = "SELECT i.name, i.comment, i.privkey, i.hostname, i.port, p.id, p.psk, p.keep_alive FROM peers AS p JOIN interfaces AS i ON p.interface2 = i.id WHERE p.interface1 = ?";
         const allowed_ips_query = "SELECT address, prefix FROM allowed_ips WHERE peer = ?";
         const details_stmt = try system.db.prepare_bind(details_query, .{ interface_id });
         const peers_stmt = try system.db.prepare_bind(peers_query, .{ interface_id });
@@ -546,40 +546,79 @@ pub const System = struct {
         if (!try details_stmt.step())
             return error.NoRecord;
 
+        const address = details_stmt.text(0);
+        const prefix = details_stmt.uint(1);
+        const privkey = details_stmt.text(2);
+        const dns = details_stmt.text(3);
+        const port = details_stmt.uint(4);
+        const routing_table = details_stmt.text(5);
+        const mtu = details_stmt.uint(6);
+        const pre_up = details_stmt.text(7);
+        const post_up = details_stmt.text(8);
+        const pre_down = details_stmt.text(9);
+        const post_down = details_stmt.text(10);
+
         try writer.print("[Interface]\n", .{});
-        try writer.print("Address = {s}/{d}\n", .{ details_stmt.text(0).?, details_stmt.uint(1) });
-        try writer.print("PrivateKey = {s}\n", .{ details_stmt.text(2).? });
-        if (details_stmt.text(3)) |dns| {
-            try writer.print("DNS = {s}\n", .{ dns });
+        try writer.print("Address = {s}/{d}\n", .{ address orelse "", prefix });
+        try writer.print("PrivateKey = {s}\n", .{ privkey orelse "" });
+        if (dns) |dns_ok| {
+            try writer.print("DNS = {s}\n", .{ dns_ok });
         }
-        if (details_stmt.uint(3) != 0)
-            try writer.print("ListenPort = {d}\n", .{ details_stmt.uint(3) });
+        if (port != 0)
+            try writer.print("ListenPort = {d}\n", .{ port });
+        if (routing_table) |rt|
+            try writer.print("Table = {s}\n", .{ rt });
+        if (mtu != 0)
+            try writer.print("MTU = {d}\n", .{ mtu });
+        if (pre_up) |val|
+            try writer.print("PreUp = {s}\n", .{ val });
+        if (post_up) |val|
+            try writer.print("PostUp = {s}\n", .{ val });
+        if (pre_down) |val|
+            try writer.print("PreDown = {s}\n", .{ val });
+        if (post_down) |val|
+            try writer.print("PostDown = {s}\n", .{ val });
 
         while (try peers_stmt.step()) {
+            const peer_name = peers_stmt.text(0);
+            const peer_comment = peers_stmt.text(1);
+            const peer_privkey = peers_stmt.text(2);
+            const peer_pubkey = if (peer_privkey) |pk| &(try keypair.base64PrivateToPublic(pk)) else "";
+            const peer_hostname = peers_stmt.text(3);
+            const peer_port = peers_stmt.uint(4);
+            const peer_id = peers_stmt.uint(5);
+            const peer_psk = peers_stmt.text(6);
+            const peer_keepalive = peers_stmt.uint(7);
+
             try writer.print("\n", .{});
             try writer.print("[Peer]\n", .{});
-            try writer.print("# {s}\n", .{ peers_stmt.text(0).? });
-            if (peers_stmt.text(1)) |comment| {
+            try writer.print("# {s}\n", .{ peer_name orelse "" });
+            if (peer_comment) |comment| {
                 try writer.print("# {s}\n", .{ comment });
             }
-            try writer.print("PublicKey = {s}\n", .{ try keypair.base64PrivateToPublic(peers_stmt.text(2).?) });
-            if (peers_stmt.text(6)) |psk| {
+            try writer.print("PublicKey = {s}\n", .{ peer_pubkey });
+            if (peer_psk) |psk| {
                 try writer.print("PresharedKey = {s}\n", .{ psk });
             }
-            if (peers_stmt.text(3)) |hostname| {
-                try writer.print("Endpoint = {s}:{d}\n", .{ hostname, peers_stmt.uint(4) });
+            if (peer_hostname) |hostname| {
+                try writer.print("Endpoint = {s}:{d}\n", .{ hostname, peer_port });
+            }
+            if (peer_keepalive != 0) {
+                try writer.print("PersistentKeepalive = {d}\n", .{ peer_keepalive });
             }
             try allowed_ips_stmt.reset();
-            try allowed_ips_stmt.bind(.{ peers_stmt.uint(5) });
+            try allowed_ips_stmt.bind(.{ peer_id });
             try writer.print("AllowedIPs = ", .{});
             var first = true;
             while (try allowed_ips_stmt.step()) {
+                const allowed_address = allowed_ips_stmt.text(0);
+                const allowed_prefix = allowed_ips_stmt.uint(1);
                 if (first) {
                     first = false;
                 } else {
                     try writer.print(", ", .{});
                 }
-                try writer.print("{s}/{d}", .{ allowed_ips_stmt.text(0).?, allowed_ips_stmt.uint(1) });
+                try writer.print("{s}/{d}", .{ allowed_address orelse "", allowed_prefix });
             }
             try writer.print("\n", .{});
         }
@@ -590,8 +629,8 @@ pub const System = struct {
     }
 
     pub fn exportOpenBSD(system: System, interface_id: u64, writer: anytype) !void {
-        const details_query = "SELECT address, prefix, privkey, port FROM interfaces WHERE id = ?";
-        const peers_query = "SELECT i.name, i.comment, i.privkey, i.hostname, i.port, p.id, p.psk FROM peers AS p JOIN interfaces AS i ON p.interface2 = i.id WHERE p.interface1 = ?";
+        const details_query = "SELECT address, prefix, privkey, dns, port, routing_table, mtu, pre_up, post_up, pre_down, post_down FROM interfaces WHERE id = ?";
+        const peers_query = "SELECT i.name, i.comment, i.privkey, i.hostname, i.port, p.id, p.psk, p.keep_alive FROM peers AS p JOIN interfaces AS i ON p.interface2 = i.id WHERE p.interface1 = ?";
         const allowed_ips_query = "SELECT address, prefix FROM allowed_ips WHERE peer = ?";
         const details_stmt = try system.db.prepare_bind(details_query, .{ interface_id });
         const peers_stmt = try system.db.prepare_bind(peers_query, .{ interface_id });
@@ -600,31 +639,72 @@ pub const System = struct {
         if (!try details_stmt.step())
             return error.NoRecord;
 
-        try writer.print("inet {s}/{d}\n", .{ details_stmt.text(0).?, details_stmt.uint(1) });
-        try writer.print("wgkey {s}\n", .{ details_stmt.text(2).? });
-        if (details_stmt.uint(3) != 0)
-            try writer.print("wgport {d}\n", .{ details_stmt.uint(3) });
+        const address = details_stmt.text(0);
+        const prefix = details_stmt.uint(1);
+        const privkey = details_stmt.text(2);
+        // const dns = details_stmt.text(3);
+        const port = details_stmt.uint(4);
+        const routing_table = details_stmt.text(5);
+        const mtu = details_stmt.uint(6);
+        const pre_up = details_stmt.text(7);
+        const post_up = details_stmt.text(8);
+        const pre_down = details_stmt.text(9);
+        const post_down = details_stmt.text(10);
+
+
+        if (pre_up) |val|
+            try writer.print("!{s}\n", .{ val });
+        try writer.print("inet {s}/{d}\n", .{ address orelse "", prefix });
+        try writer.print("wgkey {s}\n", .{ privkey orelse "" });
+        if (port != 0)
+            try writer.print("wgport {d}\n", .{ port });
+        if (routing_table) |rt| {
+            try writer.print("wgrtable {d}\n", .{ rt });
+        }
+        if (mtu != 0)
+            try writer.print("mtu {d}\n", .{ mtu });
 
         while (try peers_stmt.step()) {
-            try writer.print("wgpeer {s}", .{ try keypair.base64PrivateToPublic(peers_stmt.text(2).?) });
+            const peer_name = peers_stmt.text(0);
+            const peer_comment = peers_stmt.text(1);
+            const peer_privkey = peers_stmt.text(2);
+            const peer_pubkey = if (peer_privkey) |pk| &(try keypair.base64PrivateToPublic(pk)) else "";
+            const peer_hostname = peers_stmt.text(3);
+            const peer_port = peers_stmt.uint(4);
+            const peer_id = peers_stmt.uint(5);
+            const peer_psk = peers_stmt.text(6);
+            const peer_keepalive = peers_stmt.uint(7);
+
+            try writer.print("wgpeer {s}", .{ peer_pubkey });
             try allowed_ips_stmt.reset();
-            try allowed_ips_stmt.bind(.{ peers_stmt.uint(5) });
+            try allowed_ips_stmt.bind(.{ peer_id });
             while (try allowed_ips_stmt.step()) {
-                try writer.print(" wgaip {s}/{d}", .{ allowed_ips_stmt.text(0).?, allowed_ips_stmt.uint(1) });
+                const allowed_address = allowed_ips_stmt.text(0);
+                const allowed_prefix = allowed_ips_stmt.uint(1);
+                try writer.print(" wgaip {s}/{d}", .{ allowed_address orelse "", allowed_prefix });
             }
-            if (peers_stmt.text(6)) |psk| {
+            if (peer_psk) |psk| {
                 try writer.print(" wgpsk {s}", .{ psk });
             }
-            if (peers_stmt.text(3)) |hostname| {
-                try writer.print(" wgendpoint {s} {d}", .{ hostname, peers_stmt.uint(4) });
+            if (peer_hostname) |hostname| {
+                try writer.print(" wgendpoint {s} {d}", .{ hostname, peer_port });
             }
+            if (peer_keepalive != 0)
+                try writer.print(" wgpka {d}", .{ peer_keepalive });
 
-            try writer.print(" # {s}", .{ peers_stmt.text(0).? });
-            if (peers_stmt.text(1)) |comment| {
+            try writer.print(" # {s}", .{ peer_name orelse "" });
+            if (peer_comment) |comment| {
                 try writer.print(": {s}", .{ comment });
             }
             try writer.print("\n", .{});
         }
+
+        if (post_up) |val|
+            try writer.print("!{s}\n", .{ val });
+        if (pre_down) |val|
+            try writer.print("# PreDown = {s}\n", .{ val });
+        if (post_down) |val|
+            try writer.print("# PodtDown = {s}\n", .{ val });
 
         try details_stmt.finalize();
         try peers_stmt.finalize();

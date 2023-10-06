@@ -158,7 +158,7 @@ pub fn prepare_internal(db: *c.sqlite3, query: []const u8, query_tail: *[]const 
         query_tail.* = query[remaining_bytes..];
     }
     if (ret != c.SQLITE_OK) {
-        // std.debug.print("{s}: \"{s}\"\n", .{ c.sqlite3_errstr(ret), query });
+        std.debug.print("{s}: \"{s}\"\n", .{ c.sqlite3_errstr(ret), query });
         return error.Prepare;
     }
     return stmt.?;
