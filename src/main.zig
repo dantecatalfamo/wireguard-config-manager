@@ -256,7 +256,7 @@ pub fn usage() noreturn {
             \\  setpsk    <name1> <name2> <key>            Set the preshared key between two interfaces
             \\  clearpsk  <name1> <name2>                  Remove the preshared key between two interfaces
             \\  keepalive <name1> <name2> <seconds>        Set the persistent keepalive time between two interfaces
-            \\  set       <name> <field> [value]           Set a value for a field on an interface
+            \\  set       <name> <field>  [value]          Set a value for a field on an interface
             \\  dump      <directory>                      Export all configuration files to a directory
             \\  bash                                       Print bash completion code to stdout
             \\fields:
