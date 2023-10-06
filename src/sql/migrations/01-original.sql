@@ -31,4 +31,4 @@ CREATE TABLE allowed_ips (
     UNIQUE (peer, address, prefix)
 );
 
-COMMIT TRANSACTION;
+COMMIT;

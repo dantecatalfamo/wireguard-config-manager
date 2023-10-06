@@ -17,15 +17,21 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const db_path = try setupDbPath(allocator);
-    defer allocator.free(db_path);
-
-    const system = try System.init(db_path, allocator);
-    defer system.close() catch unreachable;
-
     var stdout_buffer = std.io.bufferedWriter(std.io.getStdOut().writer());
     const stdout = stdout_buffer.writer();
     const stderr = std.io.getStdErr().writer();
+
+    const db_path = try setupDbPath(allocator);
+    defer allocator.free(db_path);
+
+    const system = System.init(db_path, allocator) catch |err| switch (err) {
+        error.SchemaTooNew => {
+            try stderr.print("DB schema version is higher than this program supports\n", .{});
+            return os.exit(1);
+        },
+        else => return err,
+    };
+    defer system.close() catch unreachable;
 
     var arg_iter = try std.process.argsWithAllocator(allocator);
     defer arg_iter.deinit();

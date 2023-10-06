@@ -8,8 +8,9 @@ const testing = std.testing;
 
 const keypair = @import("keypair.zig");
 const sqlite = @import("sqlite.zig");
+const pragmas = @embedFile("sql/pragmas.sql");
 const schema = @embedFile("sql/schema.sql");
-const current_schema_version = 1;
+const current_schema_version = 2;
 
 pub const System = struct {
     db: sqlite.DB,
@@ -17,20 +18,45 @@ pub const System = struct {
 
     pub fn init(path: [:0]const u8, allocator: mem.Allocator) !System {
         const db = try sqlite.open(path);
+        try db.exec_multiple(pragmas);
         const system = System{
             .db = db,
             .allocator = allocator,
         };
-        try system.migrate();
+        while (try system.migrate()) {}
         return system;
     }
 
-    pub fn migrate(self: System) !void {
+    pub fn migrate(self: System) !bool {
         const schema_version = try self.getVersion();
-        if (schema_version == 0) {
-            try self.db.exec_multiple(schema);
-            try self.setVersion(current_schema_version);
+        switch (schema_version) {
+            0 => {
+                self.db.exec_multiple(schema) catch |err| switch (err) {
+                    // The first schema version didn't set the version
+                    // number, so the tables will conflict.
+                    // Set the correct schema version and begin
+                    // migrating
+                    error.Prepare => {
+                        try self.setVersion(1);
+                        return true;
+                    },
+                    else => return err,
+                };
+                try self.setVersion(current_schema_version);
+            },
+            1 => {
+                const migration_2 = @embedFile("sql/migrations/02-remaining_config_fields.sql");
+                try self.db.exec_multiple(migration_2);
+                try self.setVersion(2);
+            },
+            current_schema_version => {
+                return false;
+            },
+            current_schema_version+1...std.math.maxInt(u32) => {
+                return error.SchemaTooNew;
+            },
         }
+        return true;
     }
 
     pub fn close(self: System) !void {
