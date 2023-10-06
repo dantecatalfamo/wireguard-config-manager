@@ -168,22 +168,119 @@ pub const System = struct {
         }
     }
 
-    pub fn setField(self: System, interface_id: u64, field: Field, value: []const u8) !void {
+    pub fn setKeepAlive(self: System, interface1_id: u64, interface2_id: u64, keep_alive: u32) !void {
+        const query = "UPDATE peers SET keep_alive = ? WHERE interface1 = ? AND interface2 = ?";
+        if (keep_alive == 0) {
+            try self.db.exec(query, .{ null, interface1_id, interface2_id });
+            try self.db.exec(query, .{ null, interface2_id, interface1_id });
+        } else {
+            try self.db.exec(query, .{ keep_alive, interface1_id, interface2_id });
+            try self.db.exec(query, .{ keep_alive, interface2_id, interface1_id });
+        }
+    }
+
+    pub fn setField(self: System, interface_id: u64, field: Field, value: ?[]const u8) !void {
         switch (field) {
-            .name => try self.db.exec("UPDATE interfaces SET name = ? WHERE id = ?", .{ value, interface_id }),
-            .comment => try self.db.exec("UPDATE interfaces SET comment = ? WHERE id = ?", .{ value, interface_id }),
+            .name => {
+                if (value) |val| {
+                    try self.db.exec("UPDATE interfaces SET name = ? WHERE id = ?", .{ val, interface_id });
+                } else {
+                    return error.ConstraintFailed;
+                }
+            },
+            .comment => {
+                if (value) |val| {
+                    try self.db.exec("UPDATE interfaces SET comment = ? WHERE id = ?", .{ val, interface_id });
+                } else {
+                    try self.db.exec("UPDATE interfaces SET comment = ? WHERE id = ?", .{ null, interface_id });
+                }
+            },
             .privkey => {
-                if (!try verifyPrivkey(value))
-                    return error.InvalidKey;
-                try self.db.exec("UPDATE interfaces SET privkey = ? WHERE id = ?", .{ value, interface_id });
+                if (value) |val| {
+                    if (!try verifyPrivkey(val))
+                        return error.InvalidKey;
+                    try self.db.exec("UPDATE interfaces SET privkey = ? WHERE id = ?", .{ val, interface_id });
+                } else {
+                    return error.ConstraintFailed;
+                }
             },
-            .hostname => try self.db.exec("UPDATE interfaces SET hostname = ? WHERE id = ?", .{ value, interface_id }),
-            .port => try self.db.exec("UPDATE interfaces SET port = ? WHERE id = ?", .{ try std.fmt.parseInt(u16, value, 10), interface_id }),
+            .hostname => {
+                if (value) |val| {
+                    try self.db.exec("UPDATE interfaces SET hostname = ? WHERE id = ?", .{ val, interface_id });
+                } else {
+                    try self.db.exec("UPDATE interfaces SET hostname = ? WHERE id = ?", .{ null, interface_id });
+                }
+            },
+            .port => {
+                if (value) |val| {
+                    try self.db.exec("UPDATE interfaces SET port = ? WHERE id = ?", .{ try std.fmt.parseInt(u16, val, 10), interface_id });
+                } else {
+                    try self.db.exec("UPDATE interfaces SET port = ? WHERE id = ?", .{ null, interface_id });
+                }
+            },
             .address => {
-                const addr_pfx = try parseAddrPrefix(value);
-                try self.db.exec("UPDATE interfaces SET address = ?, prefix = ? WHERE id = ?", .{ addr_pfx.address, addr_pfx.prefix, interface_id });
+                if (value) |val| {
+                    const addr_pfx = try parseAddrPrefix(val);
+                    try self.db.exec("UPDATE interfaces SET address = ?, prefix = ? WHERE id = ?", .{ addr_pfx.address, addr_pfx.prefix, interface_id });
+                } else {
+                    return error.ConstraintFailed;
+                }
             },
-            .dns => try self.db.exec("UPDATE interfaces SET dns = ? WHERE id = ?", .{ value, interface_id }),
+            .dns => {
+                if (value) |val| {
+                    try self.db.exec("UPDATE interfaces SET dns = ? WHERE id = ?", .{ val, interface_id });
+                } else {
+                    try self.db.exec("UPDATE interfaces SET dns = ? WHERE id = ?", .{ null, interface_id });
+                }
+
+            },
+            .table => {
+                if (value) |val| {
+                    if (mem.eql(u8, val, "off") or mem.eql(u8, val, "auto")) {
+                        try self.db.exec("UPDATE interfaces SET routing_table = ? WHERE id = ?", .{ val, interface_id });
+                    } else {
+                        const num = try std.fmt.parseInt(u32, val, 10);
+                        try self.db.exec("UPDATE interfaces SET routing_table = ? WHERE id = ?", .{ num, interface_id });
+                    }
+                } else {
+                    try self.db.exec("UPDATE interfaces SET routing_table = ? WHERE id = ?", .{ null, interface_id });
+                }
+            },
+            .mtu => {
+                if (value) |val| {
+                    try self.db.exec("UPDATE interfaces SET mtu = ? WHERE id = ?", .{ try std.fmt.parseInt(u32, val, 10), interface_id });
+                } else {
+                    try self.db.exec("UPDATE interfaces SET mtu = ? WHERE id = ?", .{ null, interface_id });
+                }
+            },
+            .pre_up => {
+                if (value) |val| {
+                    try self.db.exec("UPDATE interfaces SET pre_up = ? WHERE id = ?", .{ val, interface_id });
+                } else {
+                    try self.db.exec("UPDATE interfaces SET pre_up = ? WHERE id = ?", .{ null, interface_id });
+                }
+            },
+            .post_up => {
+                if (value) |val| {
+                    try self.db.exec("UPDATE interfaces SET post_up = ? WHERE id = ?", .{ val, interface_id });
+                } else {
+                    try self.db.exec("UPDATE interfaces SET post_up = ? WHERE id = ?", .{ null, interface_id });
+                }
+            },
+            .pre_down => {
+                if (value) |val| {
+                    try self.db.exec("UPDATE interfaces SET pre_down = ? WHERE id = ?", .{ val, interface_id });
+                } else {
+                    try self.db.exec("UPDATE interfaces SET pre_down = ? WHERE id = ?", .{ null, interface_id });
+                }
+            },
+            .post_down => {
+                if (value) |val| {
+                    try self.db.exec("UPDATE interfaces SET post_down = ? WHERE id = ?", .{ val, interface_id });
+                } else {
+                    try self.db.exec("UPDATE interfaces SET post_down = ? WHERE id = ?", .{ null, interface_id });
+                }
+            },
         }
     }
 
@@ -195,6 +292,12 @@ pub const System = struct {
         port,
         address,
         dns,
+        table,
+        mtu,
+        pre_up,
+        post_up,
+        pre_down,
+        post_down,
     };
 
     pub fn listInterfaces(system: System, output_type: OutputType, writer: anytype) !void {
@@ -254,8 +357,8 @@ pub const System = struct {
     }
 
     pub fn listInterface(system: System, interface_id: u64, output_type: OutputType, writer: anytype) !void {
-        const details_query = "SELECT id, name, comment, privkey, hostname, address, prefix, port, dns FROM interfaces WHERE id = ?";
-        const peers_query = "SELECT i.id, i.name, p.psk, p.id FROM peers AS p JOIN interfaces AS i ON p.interface2 = i.id WHERE p.interface1 = ?";
+        const details_query = "SELECT id, name, comment, privkey, hostname, address, prefix, port, dns, routing_table, mtu, pre_up, post_up, pre_down, post_down FROM interfaces WHERE id = ?";
+        const peers_query = "SELECT i.id, i.name, p.psk, p.id, p.keep_alive FROM peers AS p JOIN interfaces AS i ON p.interface2 = i.id WHERE p.interface1 = ?";
         const allowed_ips_query = "SELECT address, prefix FROM allowed_ips WHERE peer = ?";
         const details_stmt = try system.db.prepare_bind(details_query, .{ interface_id });
         const peers_stmt = try system.db.prepare_bind(peers_query, .{ interface_id });
@@ -265,56 +368,112 @@ pub const System = struct {
             return;
         }
 
+        const name = details_stmt.text(1);
+        const comment = details_stmt.text(2);
+        const privkey = details_stmt.text(3);
+        const pubkey = if (privkey) |priv|
+            &(try keypair.base64PrivateToPublic(priv))
+        else
+            null;
+        const hostname = details_stmt.text(4);
+        const address = details_stmt.text(5);
+        const prefix = details_stmt.uint(6);
+        const port = details_stmt.uint(7);
+        const dns = details_stmt.text(8);
+        const routing_table = details_stmt.text(9);
+        const mtu = details_stmt.uint(10);
+        const pre_up = details_stmt.text(11);
+        const post_up = details_stmt.text(12);
+        const pre_down = details_stmt.text(13);
+        const post_down = details_stmt.text(14);
+
         switch (output_type) {
             .table => {
                 try writer.print("Interface details\n", .{});
                 try writer.print("-----------------\n", .{});
-                try writer.print("Name: {s}\n", .{ details_stmt.text(1) orelse "" });
-                try writer.print("Comment: {s}\n", .{ details_stmt.text(2) orelse "" });
-                try writer.print("Public Key: {s}\n", .{ if (details_stmt.text(3)) |priv| &(try keypair.base64PrivateToPublic(priv)) else "" });
-                try writer.print("Private Key: {s}\n", .{ details_stmt.text(3) orelse "" });
-                try writer.print("Hostname: {s}\n", .{ details_stmt.text(4) orelse "" });
-                try writer.print("Address: {s}/{d}\n", .{ details_stmt.text(5) orelse "", details_stmt.uint(6) });
-                if (details_stmt.uint(7) == 0) {
+                try writer.print("Name: {s}\n", .{ name orelse "" });
+                try writer.print("Comment: {s}\n", .{ comment orelse "" });
+                try writer.print("Public Key: {s}\n", .{ pubkey orelse "" });
+                try writer.print("Private Key: {s}\n", .{ privkey orelse "" });
+                try writer.print("Hostname: {s}\n", .{ hostname orelse "" });
+                try writer.print("Address: {s}/{d}\n", .{ address orelse "", prefix });
+                if (port == 0) {
                     try writer.print("Port:\n", .{});
                 } else {
-                    try writer.print("Port: {d}\n", .{ details_stmt.uint(7) });
+                    try writer.print("Port: {d}\n", .{ port });
                 }
-                try writer.print("DNS: {s}\n", .{ details_stmt.text(8) orelse "" });
+                try writer.print("DNS: {s}\n", .{ dns orelse "" });
+                try writer.print("Table: {s}\n", .{ routing_table orelse "" });
+                if (mtu == 0) {
+                    try writer.print("MTU:\n", .{});
+                } else {
+                    try writer.print("MTU: {d}\n", .{ mtu });
+                }
+                try writer.print("Pre  Up: {s}\n", .{ pre_up orelse "" });
+                try writer.print("Post Up: {s}\n", .{ post_up orelse "" });
+                try writer.print("Pre  Down: {s}\n", .{ pre_down orelse "" });
+                try writer.print("Post Down: {s}\n", .{ post_down orelse "" });
 
                 try writer.print("\nPeers\n", .{});
                 try writer.print("-----\n", .{});
-                try writer.print("     Name      |                  Preshared Key               |   Allowed IPs    \n", .{});
-                try writer.print("---------------+----------------------------------------------+------------------\n", .{});
+                try writer.print("     Name      |                  Preshared Key               | Keep Alive |   Allowed IPs    \n", .{});
+                try writer.print("---------------+----------------------------------------------+------------+------------------\n", .{});
             },
             .json => {
                 try writer.print("{{\"name\":", .{});
-                try json.stringify(details_stmt.text(1), .{}, writer);
+                try json.stringify(name, .{}, writer);
                 try writer.print(",\"comment\":", .{});
-                try json.stringify(details_stmt.text(2), .{}, writer);
+                try json.stringify(comment, .{}, writer);
                 try writer.print(",\"pubkey\":", .{});
-                try json.stringify(if (details_stmt.text(3)) |priv| try keypair.base64PrivateToPublic(priv) else null, .{}, writer);
+                try json.stringify(pubkey, .{}, writer);
                 try writer.print(",\"privkey\":", .{});
-                try json.stringify(details_stmt.text(3), .{}, writer);
+                try json.stringify(privkey, .{}, writer);
                 try writer.print(",\"hostname\":", .{});
-                try json.stringify(details_stmt.text(4), .{}, writer);
+                try json.stringify(hostname, .{}, writer);
                 try writer.print(",\"address\":", .{});
-                try json.stringify(details_stmt.text(5), .{}, writer);
+                try json.stringify(address, .{}, writer);
                 try writer.print(",\"prefix\":", .{});
-                try json.stringify(details_stmt.uint(6), .{}, writer);
+                try json.stringify(prefix, .{}, writer);
                 try writer.print(",\"port\":", .{});
-                try json.stringify(if (details_stmt.uint(7) == 0) null else details_stmt.uint(7), .{}, writer);
+                try json.stringify(if (port == 0) null else port, .{}, writer);
                 try writer.print(",\"dns\":", .{});
-                try json.stringify(details_stmt.text(8), .{}, writer);
+                try json.stringify(dns, .{}, writer);
+
+                try writer.print(",\"table\":", .{});
+                if (mem.eql(u8, routing_table orelse "", "off") or mem.eql(u8, routing_table orelse "", "auto")) {
+                    try json.stringify(routing_table, .{}, writer);
+                } else if (routing_table) |rtab| {
+                    try json.stringify(try std.fmt.parseInt(u32, rtab, 10), .{}, writer);
+                } else {
+                    try json.stringify(null, .{}, writer);
+                }
+                try writer.print(",\"mtu\":", .{});
+                try json.stringify(if (mtu == 0) null else mtu, .{}, writer);
+                try writer.print(",\"pre_up\":", .{});
+                try json.stringify(pre_up, .{}, writer);
+                try writer.print(",\"post_up\":", .{});
+                try json.stringify(post_up, .{}, writer);
+                try writer.print(",\"pre_down\":", .{});
+                try json.stringify(pre_down, .{}, writer);
+                try writer.print(",\"post_down\":", .{});
+                try json.stringify(post_down, .{}, writer);
                 try writer.print(",\"peers\":[", .{});
             }
         }
 
         var first_peer = true;
         while (try peers_stmt.step()) {
+            const peer_name = peers_stmt.text(1);
+            const peer_psk = peers_stmt.text(2);
+            const peer_id = peers_stmt.uint(3);
+            const peer_keep_alive = peers_stmt.uint(4);
             switch (output_type) {
                 .table => {
-                    try writer.print("{s: <14} | {s: <44} | ", .{ peers_stmt.text(1) orelse "", peers_stmt.text(2) orelse "" });
+                    if (peer_keep_alive == 0) {
+                        try writer.print("{s: <14} | {s: <44} |            | ", .{ peer_name orelse "", peer_psk orelse "" });
+                    } else {
+                        try writer.print("{s: <14} | {s: <44} | {d: >10} | ", .{ peer_name orelse "", peer_psk orelse "", peer_keep_alive });
+                    }
                 },
                 .json => {
                     if (first_peer) {
@@ -323,16 +482,20 @@ pub const System = struct {
                         try writer.print(",", .{});
                     }
                     try writer.print("{{\"name\":", .{});
-                    try json.stringify(peers_stmt.text(1), .{}, writer);
+                    try json.stringify(peer_name, .{}, writer);
                     try writer.print(",\"psk\":", .{});
-                    try json.stringify(peers_stmt.text(2), .{}, writer);
+                    try json.stringify(peer_psk, .{}, writer);
+                    try writer.print(",\"keep_alive\":", .{});
+                    try json.stringify(if (peer_keep_alive == 0) null else peer_keep_alive, .{}, writer);
                     try writer.print(",\"allowed_ips\":[", .{});
                 }
             }
             try allowed_ips_stmt.reset();
-            try allowed_ips_stmt.bind(.{ peers_stmt.int(3) });
+            try allowed_ips_stmt.bind(.{ peer_id });
             var first_ip = true;
             while (try allowed_ips_stmt.step()) {
+                const allowed_ip = allowed_ips_stmt.text(0);
+                const allowed_prefix = allowed_ips_stmt.uint(1);
                 switch (output_type) {
                     .table => {
                         if (first_ip) {
@@ -340,7 +503,7 @@ pub const System = struct {
                         } else {
                             try writer.print(", ", .{});
                         }
-                        try writer.print("{s}/{d}", .{ allowed_ips_stmt.text(0).?, allowed_ips_stmt.uint(1) });
+                        try writer.print("{s}/{d}", .{ allowed_ip orelse "", allowed_prefix });
                     },
                     .json => {
                         if (first_ip) {
@@ -349,9 +512,9 @@ pub const System = struct {
                             try writer.print(",", .{});
                         }
                         try writer.print("{{\"address\":", .{});
-                        try json.stringify(allowed_ips_stmt.text(0), .{}, writer);
+                        try json.stringify(allowed_ip, .{}, writer);
                         try writer.print(",\"prefix\":", .{});
-                        try json.stringify(allowed_ips_stmt.uint(1), .{}, writer);
+                        try json.stringify(allowed_prefix, .{}, writer);
                         try writer.print("}}", .{});
                     }
                 }
