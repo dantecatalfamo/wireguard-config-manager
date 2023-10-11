@@ -27,6 +27,7 @@ commands:
   keepalive <name1> <name2> <seconds>        Set the persistent keepalive time between two interfaces
   set       <name> <field>  [value]          Set a value for a field on an interface
   dump      <directory>                      Export all configuration files to a directory
+  dump      -                                Dump all interfaces as JSON to stdout
   bash                                       Print bash completion code to stdout
 fields:
   name

@@ -33,6 +33,16 @@ pub fn main() !void {
     };
     defer system.close() catch unreachable;
 
+    var env = try std.process.getEnvMap(allocator);
+    defer env.deinit();
+    var output_format: System.OutputType = .table;
+
+    if (env.get("WGCM_OUTPUT")) |wgcm_json| {
+        if (mem.eql(u8, wgcm_json, "json")) {
+            output_format = .json;
+        }
+    }
+
     var arg_iter = try std.process.argsWithAllocator(allocator);
     defer arg_iter.deinit();
 
@@ -42,14 +52,6 @@ pub fn main() !void {
 
     switch (command) {
         .list => {
-            var env = try std.process.getEnvMap(allocator);
-            defer env.deinit();
-            var output_format: System.OutputType = .table;
-            if (env.get("WGCM_OUTPUT")) |wgcm_json| {
-                if (mem.eql(u8, wgcm_json, "json")) {
-                    output_format = .json;
-                }
-            }
             if (arg_iter.next()) |name| {
                 const id = system.interfaceIdFromName(name)  catch |err| switch (err) {
                     error.NoRecord => {
@@ -189,7 +191,11 @@ pub fn main() !void {
         },
         .dump => {
             const dir = arg_iter.next() orelse usage();
-            try system.dump(dir);
+            if (mem.eql(u8, dir, "-")) {
+                try system.jsonDump(stdout);
+            } else {
+                try system.dump(dir);
+            }
         },
         .bash => {
             const contents = @embedFile("completion.bash");
@@ -258,6 +264,7 @@ pub fn usage() noreturn {
             \\  keepalive <name1> <name2> <seconds>        Set the persistent keepalive time between two interfaces
             \\  set       <name> <field>  [value]          Set a value for a field on an interface
             \\  dump      <directory>                      Export all configuration files to a directory
+            \\  dump      -                                Dump all interfaces as JSON to stdout
             \\  bash                                       Print bash completion code to stdout
             \\fields:
             \\  name

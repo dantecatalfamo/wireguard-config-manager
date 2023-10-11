@@ -541,6 +541,24 @@ pub const System = struct {
         try allowed_ips_stmt.finalize();
     }
 
+    pub fn jsonDump(self: System, writer: anytype) !void {
+        const query = "SELECT id FROM interfaces";
+        const stmt = try self.db.prepare(query, null);
+        try writer.print("[\n", .{});
+        var first = true;
+        while (try stmt.step()) {
+            if (first) {
+                first = false;
+            } else {
+                try writer.print(",", .{});
+            }
+            const id = stmt.uint(0);
+            try listInterface(self, id, .json, writer);
+        }
+        try writer.print("]\n", .{});
+        try stmt.finalize();
+    }
+
     pub fn exportConf(system: System, interface_id: u64, writer: anytype) !void {
         const details_query = "SELECT address, prefix, privkey, dns, port, routing_table, mtu, pre_up, post_up, pre_down, post_down FROM interfaces WHERE id = ?";
         const peers_query = "SELECT i.name, i.comment, i.privkey, i.hostname, i.port, p.id, p.psk, p.keep_alive FROM peers AS p JOIN interfaces AS i ON p.interface2 = i.id WHERE p.interface1 = ?";
