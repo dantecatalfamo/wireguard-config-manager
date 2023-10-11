@@ -9,7 +9,13 @@ CREATE TABLE interfaces (
     port INTEGER,
     address TEXT NOT NULL UNIQUE,
     prefix INTEGER,
-    dns TEXT
+    dns TEXT,
+    routing_table TEXT,
+    mtu INTEGER,
+    pre_up TEXT,
+    post_up TEXT,
+    pre_down TEXT,
+    post_down TEXT
 );
 
 CREATE TABLE peers (
@@ -17,6 +23,7 @@ CREATE TABLE peers (
     interface1 INTEGER NOT NULL,
     interface2 INTEGER NOT NULL,
     psk TEXT,
+    keep_alive INTEGER,
     FOREIGN KEY (interface1) REFERENCES interfaces (id) ON DELETE CASCADE,
     FOREIGN KEY (interface2) REFERENCES interfaces (id) ON DELETE CASCADE,
     UNIQUE (interface1, interface2)
