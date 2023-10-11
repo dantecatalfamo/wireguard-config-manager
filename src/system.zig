@@ -221,7 +221,13 @@ pub const System = struct {
             .address => {
                 if (value) |val| {
                     const addr_pfx = try parseAddrPrefix(val);
+                    try self.db.exec("BEGIN TRANSACTION", .{});
+                    try self.db.exec(
+                        "UPDATE allowed_ips SET address = ? WHERE address = (SELECT address FROM interfaces WHERE id = ?)",
+                        .{ addr_pfx.address, interface_id }
+                    );
                     try self.db.exec("UPDATE interfaces SET address = ?, prefix = ? WHERE id = ?", .{ addr_pfx.address, addr_pfx.prefix, interface_id });
+                    try self.db.exec("COMMIT TRANSACTION", .{});
                 } else {
                     return error.ConstraintFailed;
                 }
