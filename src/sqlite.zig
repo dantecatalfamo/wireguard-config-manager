@@ -10,8 +10,13 @@ const c = @cImport({
 });
 
 pub fn open(path: [:0]const u8) !DB {
+    const db = try open_internal(path);
+    const ret = c.sqlite3_create_function(db, "aton", 1, c.SQLITE_UTF8 | c.SQLITE_DETERMINISTIC, null, sqlite_aton, null, null);
+    if (ret != c.SQLITE_OK) {
+        return error.CustomFunction;
+    }
     return DB{
-        .ptr = try open_internal(path),
+        .ptr = db,
     };
 }
 
@@ -116,6 +121,16 @@ pub const Stmt = struct {
             return null;
         }
         return std.mem.span(val);
+    }
+
+    pub fn blob(self: Stmt, column: u32) ?[]const u8 {
+        const val = c.sqlite3_column_blob(self.ptr, @intCast(column));
+        if (val == null) {
+            return null;
+        }
+        const bytes: [*]const u8 = @ptrCast(val);
+        const size = c.sqlite3_column_bytes(self.ptr, @intCast(column));
+        return bytes[0..@intCast(size)];
     }
 
     pub fn int(self: Stmt, column: u32) i64 {
@@ -248,4 +263,20 @@ pub fn close_internal(db: *c.sqlite3) !void {
             return error.Close;
         }
     }
+}
+
+export fn sqlite_aton(context: ?*c.sqlite3_context, argc: c_int, argv: [*c]?*c.sqlite3_value) void {
+    _ = argc;
+    var in_buf = [_]u8{0} ** 16;
+    const ip = mem.span(c.sqlite3_value_text(argv[0].?));
+    const parsed = std.net.Address.parseIp(ip, 0) catch {
+        c.sqlite3_result_error(context, "Unable to parse IP", 18);
+        return;
+    };
+    if (mem.indexOf(u8, ip, ":")) |_| {
+        @memcpy(&in_buf, &parsed.in6.sa.addr);
+    } else {
+        @memcpy(in_buf[12..], mem.asBytes(&parsed.in.sa.addr));
+    }
+    c.sqlite3_result_blob(context, &in_buf, 16, c.SQLITE_TRANSIENT);
 }
