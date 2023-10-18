@@ -509,7 +509,7 @@ pub const System = struct {
                         } else {
                             try writer.print(", ", .{});
                         }
-                        try writer.print("{s}/{d}", .{ allowed_ip orelse "", allowed_prefix });
+                        try writer.print("{s: <15}/{d: <2}", .{ allowed_ip orelse "", allowed_prefix });
                     },
                     .json => {
                         if (first_ip) {
