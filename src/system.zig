@@ -364,7 +364,7 @@ pub const System = struct {
 
     pub fn listInterface(system: System, interface_id: u64, output_type: OutputType, writer: anytype) !void {
         const details_query = "SELECT id, name, comment, privkey, hostname, address, prefix, port, dns, routing_table, mtu, pre_up, post_up, pre_down, post_down FROM interfaces WHERE id = ?";
-        const peers_query = "SELECT i.id, i.name, p.psk, p.id, p.keep_alive FROM peers AS p JOIN interfaces AS i ON p.interface2 = i.id WHERE p.interface1 = ?";
+        const peers_query = "SELECT i.id, i.name, p.psk, p.id, p.keep_alive FROM peers AS p JOIN interfaces AS i ON p.interface2 = i.id WHERE p.interface1 = ? ORDER BY aton(i.address)";
         const allowed_ips_query = "SELECT address, prefix FROM allowed_ips WHERE peer = ? ORDER BY aton(address)";
         const details_stmt = try system.db.prepare_bind(details_query, .{ interface_id });
         const peers_stmt = try system.db.prepare_bind(peers_query, .{ interface_id });
