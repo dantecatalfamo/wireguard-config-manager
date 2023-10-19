@@ -37,6 +37,7 @@ pub const DB = struct {
     }
 
     pub fn prepare_bind(self: DB, query: []const u8, values: anytype) !Stmt {
+        // std.debug.print("Preparing: {s}\n", .{query});
         var query_tail = query;
         const stmt = try self.prepare(query, &query_tail);
         if (!query_empty(query_tail)) {

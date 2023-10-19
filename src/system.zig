@@ -73,6 +73,10 @@ pub const System = struct {
 
     pub fn addInterface(self: System, name: []const u8, address: []const u8, prefix: u6, privkey: ?[32]u8) !u64 {
         const query = "INSERT INTO interfaces (name, address, prefix, privkey) VALUES (?, ?, ?, ?) RETURNING id";
+        // Make sure we can parse the IP
+        _ = std.net.Address.parseIp(address, 0) catch {
+            return error.InvalidIP;
+        };
         const kp = if (privkey) |pk|
             try keypair.fromPrivateKey(pk)
         else

@@ -76,6 +76,10 @@ pub fn main() !void {
                     try stderr.print("New interface conflicts with existing interface\n", .{});
                     os.exit(1);
                 },
+                error.InvalidIP => {
+                    try stderr.print("Invalid IP: {s}\n", .{ addr_pfx.address });
+                    os.exit(1);
+                },
                 else => return err,
             };
         },
