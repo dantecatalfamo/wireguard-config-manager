@@ -311,8 +311,8 @@ pub const System = struct {
         const stmt = try system.db.prepare_bind(query, .{});
         switch (output_type) {
             .table => {
-                try writer.print("     Name      |       Address      |                  Public Key                  | Peers | Comment \n", .{});
-                try writer.print("---------------+--------------------+----------------------------------------------+-------+---------\n", .{});
+                try writer.print("         Name          |       Address      |                  Public Key                  | Peers | Comment \n", .{});
+                try writer.print("-----------------------+--------------------+----------------------------------------------+-------+---------\n", .{});
             },
             .json => {
                 try writer.print("[", .{});
@@ -323,7 +323,7 @@ pub const System = struct {
             switch (output_type) {
                 .table => {
                     try writer.print(
-                        "{?s: <14} | {?s: <15}/{d: <2} | {s} | {d: <5} | {s}\n", .{
+                        "{?s: <22} | {?s: <15}/{d: <2} | {s} | {d: <5} | {s}\n", .{
                             stmt.text(0),
                             stmt.text(1),
                             stmt.uint(2),
@@ -422,8 +422,8 @@ pub const System = struct {
 
                 try writer.print("\nPeers\n", .{});
                 try writer.print("-----\n", .{});
-                try writer.print("     Name      |                  Preshared Key               | Keep Alive |   Allowed IPs    \n", .{});
-                try writer.print("---------------+----------------------------------------------+------------+------------------\n", .{});
+                try writer.print("         Name          |                  Preshared Key               | Keep Alive |   Allowed IPs    \n", .{});
+                try writer.print("-----------------------+----------------------------------------------+------------+------------------\n", .{});
             },
             .json => {
                 try writer.print("{{\"name\":", .{});
@@ -476,9 +476,9 @@ pub const System = struct {
             switch (output_type) {
                 .table => {
                     if (peer_keep_alive == 0) {
-                        try writer.print("{s: <14} | {s: <44} |            | ", .{ peer_name orelse "", peer_psk orelse "" });
+                        try writer.print("{s: <22} | {s: <44} |            | ", .{ peer_name orelse "", peer_psk orelse "" });
                     } else {
-                        try writer.print("{s: <14} | {s: <44} | {d: >10} | ", .{ peer_name orelse "", peer_psk orelse "", peer_keep_alive });
+                        try writer.print("{s: <22} | {s: <44} | {d: >10} | ", .{ peer_name orelse "", peer_psk orelse "", peer_keep_alive });
                     }
                 },
                 .json => {
