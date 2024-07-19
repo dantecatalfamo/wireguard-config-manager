@@ -758,7 +758,7 @@ pub const System = struct {
     }
 
     pub fn parseAddrPrefix(str: []const u8) !AddrPrefix {
-        var iter = mem.split(u8, str, "/");
+        var iter = mem.splitScalar(u8, str, '/');
         const addr = iter.first();
         const prefix_str = iter.next() orelse "32";
         const prefix = try std.fmt.parseInt(u6, prefix_str, 10);

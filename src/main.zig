@@ -4,6 +4,7 @@ const fs = std.fs;
 const mem = std.mem;
 const os = std.os;
 const testing = std.testing;
+const process = std.process;
 
 const keypair = @import("keypair.zig");
 const sqlite = @import("sqlite.zig");
@@ -27,7 +28,7 @@ pub fn main() !void {
     const system = System.init(db_path, allocator) catch |err| switch (err) {
         error.SchemaTooNew => {
             try stderr.print("DB schema version is higher than this program supports\n", .{});
-            return os.exit(1);
+            return process.exit(1);
         },
         else => return err,
     };
@@ -56,7 +57,7 @@ pub fn main() !void {
                 const id = system.interfaceIdFromName(name)  catch |err| switch (err) {
                     error.NoRecord => {
                         try stderr.print("No interface \"{s}\"\n", .{ name });
-                        os.exit(1);
+                        process.exit(1);
                     },
                     else => return err,
                 };
@@ -74,11 +75,11 @@ pub fn main() !void {
             _ = system.addInterface(name, addr_pfx.address, addr_pfx.prefix, null) catch |err| switch (err) {
                 error.ConstraintFailed => {
                     try stderr.print("New interface conflicts with existing interface\n", .{});
-                    os.exit(1);
+                    process.exit(1);
                 },
                 error.InvalidIP => {
                     try stderr.print("Invalid IP: {s}\n", .{ addr_pfx.address });
-                    os.exit(1);
+                    process.exit(1);
                 },
                 else => return err,
             };
@@ -90,7 +91,7 @@ pub fn main() !void {
             system.addPeer(if1, if2) catch |err| switch (err) {
                 error.ConstraintFailed => {
                     try stderr.print("Interfaces are already peered\n", .{});
-                    os.exit(1);
+                    process.exit(1);
                 },
                 else => return err,
             };
@@ -102,7 +103,7 @@ pub fn main() !void {
             system.addRouter(if2, if1) catch |err| switch (err) {
                 error.ConstraintFailed => {
                     try stderr.print("Interfaces are already peered\n", .{});
-                    os.exit(1);
+                    process.exit(1);
                 },
                 else => return err,
             };
@@ -115,7 +116,7 @@ pub fn main() !void {
             system.addAllowedIP(if1, if2, addr_pfx.address, addr_pfx.prefix) catch |err| switch (err) {
                 error.ConstraintFailed => {
                     try stderr.print("IP range already allowed\n", .{});
-                    os.exit(1);
+                    process.exit(1);
                 },
                 else => return err,
             };
@@ -184,13 +185,13 @@ pub fn main() !void {
                 system.setField(id, f, value) catch |err| switch (err) {
                     error.ConstraintFailed => {
                         try stderr.print("Change conflicts with another interface\n", .{});
-                        os.exit(1);
+                        process.exit(1);
                     },
                     else => return err,
                 };
             } else {
                 try stderr.print("Invalid field name\n", .{});
-                os.exit(1);
+                process.exit(1);
             }
         },
         .dump => {
@@ -286,7 +287,7 @@ pub fn usage() noreturn {
             \\  post_down
             \\
     ) catch unreachable;
-    std.os.exit(1);
+    std.process.exit(1);
 }
 
 pub fn argInt(iter: *std.process.ArgIterator) !u64 {
@@ -299,7 +300,7 @@ pub fn interfaceId(system: System, iter: *std.process.ArgIterator) !u64 {
     return system.interfaceIdFromName(name) catch |err| switch (err) {
         error.NoRecord => {
             std.debug.print("Interface \"{s}\" does not exist\n", .{ name });
-            os.exit(1);
+            process.exit(1);
         },
         else => return err,
     };
@@ -312,15 +313,15 @@ pub fn setupDbPath(allocator: mem.Allocator) ![:0]const u8 {
     if (custom_db_path) |custom_path| {
         const dir_name = fs.path.dirname(custom_path) orelse {
             std.debug.print("Invalid custom DB path (WGMC_DB_PATH)\n", .{});
-            os.exit(1);
+            process.exit(1);
         };
         if (!fs.path.isAbsolute(dir_name)) {
             std.debug.print("Invalid custom DB path (WGMC_DB_PATH): Path must be absolute\n", .{});
-            os.exit(1);
+            process.exit(1);
         }
         fs.cwd().access(dir_name, .{}) catch {
             std.debug.print("Invalid custom DB path (WGMC_DB_PATH): Directory does not exist\n", .{});
-            os.exit(1);
+            process.exit(1);
         };
         return try allocator.dupeZ(u8, custom_path);
     }
@@ -344,7 +345,7 @@ pub fn setupDbPath(allocator: mem.Allocator) ![:0]const u8 {
 pub fn checkPeering(if1: u64, if2: u64) void {
     if (if1 == if2) {
         std.debug.print("You cannot relate interfaces to themselves\n", .{});
-        os.exit(1);
+        process.exit(1);
     }
 }
 
