@@ -166,7 +166,7 @@ pub fn open_internal(path: [:0]const u8) !*c.sqlite3 {
 }
 
 pub fn prepare_internal(db: *c.sqlite3, query: []const u8, query_tail: *[]const u8) !*c.sqlite3_stmt {
-    var tail_ptr: [*c]u8 = undefined;
+    var tail_ptr: [*c]const u8 = undefined;
     var stmt: ?*c.sqlite3_stmt = null;
     const ret = c.sqlite3_prepare_v2(db, query.ptr, @intCast(query.len), &stmt, &tail_ptr);
     if (tail_ptr != null) {
@@ -185,25 +185,25 @@ pub fn bind_internal(stmt: *c.sqlite3_stmt, values: anytype) !void {
         const value = @field(values, field.name);
         const index = idx + 1;
         const ret = switch (@typeInfo(@TypeOf(value))) {
-            .Int, .ComptimeInt => c.sqlite3_bind_int64(stmt, index, @intCast(value)),
-            .Array => |arr| blk: {
+            .int, .comptime_int => c.sqlite3_bind_int64(stmt, index, @intCast(value)),
+            .array => |arr| blk: {
                 if (arr.child != u8) {
                     @compileError("Unsupported array type " ++ @tagName(arr.child));
                 }
                 break :blk c.sqlite3_bind_text(stmt, index, value.ptr, value.len, c.SQLITE_TRANSIENT);
             },
-            .Pointer => |ptr| blk: {
+            .pointer => |ptr| blk: {
                 switch (ptr.size) {
-                    .One => {
-                        if (@typeInfo(ptr.child) != .Array) {
+                    .one => {
+                        if (@typeInfo(ptr.child) != .array) {
                             @compileError("Unsupported single pointer child " ++ @tagName(@typeInfo(ptr.child)));
                         }
-                        if (@typeInfo(ptr.child).Array.child != u8) {
+                        if (@typeInfo(ptr.child).array.child != u8) {
                             @compileError("Unsupported array pointer child " ++ @tagName(@typeInfo(ptr.child).Array.child));
                         }
                         break :blk c.sqlite3_bind_text(stmt, index, value, value.len, c.SQLITE_TRANSIENT);
                     },
-                    .Slice => {
+                    .slice => {
                         if (ptr.child != u8) {
                             @compileError("Unsupported pointer type " ++ @tagName(ptr.size) ++ " " ++ @tagName(@typeInfo(ptr.child)));
                         }
@@ -212,7 +212,7 @@ pub fn bind_internal(stmt: *c.sqlite3_stmt, values: anytype) !void {
                     else => { @compileError("Unsupported pointer size " ++ @tagName(ptr.size)); },
                 }
             },
-            .Null => c.sqlite3_bind_null(stmt, index),
+            .null => c.sqlite3_bind_null(stmt, index),
             else => |ty| {
                 @compileError("Unsupported type " ++ @tagName(ty));
             },

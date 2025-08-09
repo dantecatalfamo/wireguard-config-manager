@@ -23,7 +23,7 @@ pub const KeyPair = struct {
 };
 
 pub fn generateKeyPair() !KeyPair {
-    const keypair = try std.crypto.dh.X25519.KeyPair.create(null);
+    const keypair = std.crypto.dh.X25519.KeyPair.generate();
     return KeyPair{
         .public = keypair.public_key,
         .private = keypair.secret_key,
